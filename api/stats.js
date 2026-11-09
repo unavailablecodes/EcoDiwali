@@ -5,7 +5,7 @@
 // happens inside the database (public.ecodiwiki_stats RPC, see supabase/schema.sql).
 // Results are not cached: the dashboard is meant to mirror the database live.
 
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export default async function handler(req, res) {
   const token = String(req.query?.token || '');
@@ -47,10 +47,9 @@ function verifyToken(token) {
   if (parts.length !== 3 || parts[0] !== 'v1') return false;
   const exp = parseInt(Buffer.from(parts[1], 'base64url').toString(), 10);
   if (!Number.isFinite(exp) || Date.now() > exp) return false;
+  // parts[2] is the base64url signature as issued; recompute it and compare in
+  // constant time. Length-guarded so timingSafeEqual does not throw.
   const expect = createHmac('sha256', SALT).update(parts[1]).digest('base64url');
-  const a = Buffer.from(parts[2], 'base64url').toString(), b = expect;
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+  const a = Buffer.from(parts[2], 'base64url'), b = Buffer.from(expect, 'base64url');
+  return a.length === b.length && timingSafeEqual(a, b);
 }
