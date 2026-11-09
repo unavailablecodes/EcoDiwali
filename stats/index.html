@@ -1,0 +1,414 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Pataka · Stats</title>
+<style>
+:root {
+  /* validated default palette (light) */
+  --page: #f9f9f7; --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --baseline: #c3c2b7;
+  --border: rgba(11,11,11,0.10);
+  --series-1: #2a78d6; --series-2: #eb6834;
+  --pill-active-bg: #0b0b0b; --pill-active-text: #fcfcfb;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --page: #0d0d0d; --surface-1: #1a1a19;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835;
+    --border: rgba(255,255,255,0.10);
+    --series-1: #3987e5; --series-2: #d95926;
+    --pill-active-bg: #f0efec; --pill-active-text: #0d0d0d;
+  }
+}
+html { color-scheme: dark light; }
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--text-primary);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+.wrap { max-width: 960px; margin: 0 auto; padding: 28px 20px 60px; }
+header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+h1 { font-size: 20px; margin: 0; font-weight: 650; }
+h1 a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--border); }
+.status { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.dot.on { background: #0ca30c; }
+.dot.err { background: #d03b3b; }
+.spacer { flex: 1; }
+.days { display: flex; gap: 6px; }
+.days button {
+  font: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface-1); color: var(--text-secondary); cursor: pointer;
+}
+.days button[aria-pressed="true"] { background: var(--pill-active-bg); color: var(--pill-active-text); border-color: transparent; font-weight: 600; }
+
+/* KPI tiles */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tile .k { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.tile .v { font-size: 34px; font-weight: 700; line-height: 1.15; margin-top: 2px; }
+.tile .s { font-size: 12.5px; color: var(--text-secondary); }
+
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+.card .sub { font-size: 12.5px; color: var(--muted); margin: 0 0 12px; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 700px) { .row2 { grid-template-columns: 1fr; } }
+
+/* legend */
+.legend { display: flex; gap: 16px; font-size: 13px; color: var(--text-secondary); margin: 0 0 8px; flex-wrap: wrap; }
+.legend .sw { width: 10px; height: 10px; border-radius: 3px; display: inline-block; margin-right: 6px; vertical-align: -1px; }
+
+svg { display: block; width: 100%; height: auto; }
+text { font-family: inherit; }
+.tip {
+  position: absolute; pointer-events: none; opacity: 0; transition: opacity .12s;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; font-size: 12.5px; color: var(--text-primary); box-shadow: 0 4px 16px rgba(0,0,0,.14);
+}
+.tip b { font-weight: 600; }
+.tip .l { display: flex; gap: 8px; align-items: center; }
+.tip .l .sw { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+.chartbox { position: relative; }
+
+/* tables */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 6px 8px; border-bottom: 1px solid var(--baseline); }
+td { padding: 7px 8px; border-bottom: 1px solid var(--grid); color: var(--text-secondary); vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+td.num { font-variant-numeric: tabular-nums; color: var(--text-primary); }
+.dim { color: var(--muted); }
+.empty, .errbox { color: var(--muted); font-size: 14px; padding: 8px 0; }
+.errbox { color: #d03b3b; }
+code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--grid); border-radius: 4px; padding: 1px 5px; color: var(--text-primary); }
+.foot { font-size: 12px; color: var(--muted); margin-top: 8px; }
+
+/* login gate */
+#gate {
+  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
+  background: var(--page); padding: 20px;
+}
+#gate [hidden] { display: none !important; }
+.gatebox { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 28px 26px; width: min(360px, 100%); text-align: center; }
+.gatebox .lock { width: 44px; height: 44px; margin: 0 auto 12px; border-radius: 50%; background: var(--grid); display: grid; place-items: center; }
+.gatebox .lock svg { width: 20px; height: 20px; stroke: var(--text-secondary); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.gatebox h2 { margin: 0 0 4px; font-size: 17px; }
+.gatebox p { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
+.gatebox input {
+  width: 100%; font: inherit; font-size: 14px; padding: 10px 12px; margin-bottom: 10px;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--page); color: var(--text-primary);
+}
+.gatebox input:focus { outline: 2px solid var(--series-1); outline-offset: -1px; }
+.gatebox button {
+  width: 100%; font: inherit; font-size: 14px; font-weight: 600; padding: 10px;
+  border: 0; border-radius: 9px; background: var(--series-1); color: #fff; cursor: pointer;
+}
+.gatebox button:disabled { opacity: .6; cursor: default; }
+#gatemsg { font-size: 13px; color: #d03b3b; min-height: 18px; margin: 8px 0 0; }
+#gate .fine { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div id="gate">
+  <div class="gatebox" id="gatebox">
+    <div class="lock"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
+    <h2>Private stats</h2>
+    <p>Owner access only. Sign in with the credentials set up in the dashboard host.</p>
+    <form id="gateform">
+      <input id="gateuser" type="text" autocomplete="username" spellcheck="false" placeholder="Username" aria-label="Username">
+      <input id="gatepass" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password">
+      <button id="gatebtn" type="submit">Sign in</button>
+      <p id="gatemsg" role="alert"></p>
+    </form>
+    <p class="fine">The token lasts 12 hours. No data is shown to anyone without it.</p>
+  </div>
+</div>
+<div class="wrap" hidden>
+  <header>
+    <h1><a href="/">Pataka</a> · Stats</h1>
+    <div class="status"><span class="dot" id="dot"></span><span id="statustext">connecting…</span></div>
+    <div class="spacer"></div>
+    <div class="days" id="days">
+      <button data-d="7" type="button">7d</button>
+      <button data-d="30" type="button" aria-pressed="true">30d</button>
+      <button data-d="90" type="button">90d</button>
+      <button data-d="365" type="button">1y</button>
+      <button id="signout" type="button" style="margin-left:8px;background:transparent;color:var(--muted);border:0;font:inherit;font-size:13px;cursor:pointer">Sign out</button>
+    </div>
+  </header>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card">
+    <h2>Visits per day</h2>
+    <p class="sub">One line per series; hover for exact values.</p>
+    <div class="legend">
+      <span><span class="sw" style="background: var(--series-1)"></span>New visitors</span>
+      <span><span class="sw" style="background: var(--series-2)"></span>Events</span>
+    </div>
+    <div class="chartbox" id="linebox"><div class="empty">No data yet.</div></div>
+  </div>
+
+  <div class="row2">
+    <div class="card">
+      <h2>Most-fired crackers</h2>
+      <p class="sub">Sum of every cracker set off, by exit reports.</p>
+      <div id="crackers"><div class="empty">No data yet.</div></div>
+    </div>
+    <div class="card">
+      <h2>Operating systems</h2>
+      <p class="sub">Split of visitors in the window; tail folded into “Other”.</p>
+      <div id="osbox"><div class="empty">No data yet.</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Countries</h2>
+    <p class="sub">From IP lookup; “unknown” where the lookup failed.</p>
+    <div id="countries"><div class="empty">No data yet.</div></div>
+  </div>
+
+  <div class="card">
+    <h2>Latest visitors</h2>
+    <p class="sub">Most recent 15 browsers (identity = cookie + localStorage, per browser).</p>
+    <div id="recent"><div class="empty">No data yet.</div></div>
+  </div>
+
+  <p class="foot">Synced live from Supabase <code>pataka_events</code> · refreshes every 45 s · source: <a href="/" style="color: inherit">pataka app</a></p>
+</div>
+<div class="tip" id="tip"></div>
+
+<script>
+'use strict';
+const $ = (s) => document.querySelector(s);
+const DAYS = 30; let curDays = DAYS;
+const REFRESH_MS = 45000;
+const TOKEN_KEY = 'pataka.stats.token';
+let authToken = sessionStorage.getItem(TOKEN_KEY) || '';
+
+/* ---------- login gate ---------- */
+function showGate() { $('#gate').hidden = false; $('.wrap').hidden = true; }
+function showDash() { $('#gate').hidden = true; $('.wrap').hidden = false; load(); }
+
+$('#gateform').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const u = $('#gateuser').value.trim(), p = $('#gatepass').value, msg = $('#gatemsg'), btn = $('#gatebtn');
+  msg.textContent = '';
+  btn.disabled = true; btn.textContent = 'Signing in…';
+  try {
+    const r = await fetch('api/auth', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: u, pass: p }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Sign-in failed.');
+    authToken = j.token;
+    sessionStorage.setItem(TOKEN_KEY, authToken);
+    showDash();
+  } catch (err) {
+    msg.textContent = err.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Sign in';
+  }
+});
+
+if (authToken) showDash(); // resume a session within its 12 h window
+
+$('#signout').addEventListener('click', () => {
+  authToken = '';
+  sessionStorage.removeItem(TOKEN_KEY);
+  showGate();
+});
+
+document.querySelectorAll('#days button').forEach((b) => b.addEventListener('click', () => {
+  curDays = +b.dataset.d;
+  document.querySelectorAll('#days button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  load();
+}));
+
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function fmtNum(n) { return (n == null) ? '—' : Number(n).toLocaleString(); }
+function fmtTime(ms) {
+  if (ms == null) return '—';
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + ' s';
+  const m = Math.floor(s / 60);
+  return m + ' m ' + (s % 60) + ' s';
+}
+function fmtDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ', ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+}
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip');
+function showTip(html, x, y) {
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  const left = Math.min(x + 14, innerWidth - r.width - 10);
+  tip.style.left = left + 'px'; tip.style.top = (y - r.height - 10 < 0 ? y + 16 : y - r.height - 10) + 'px';
+}
+function hideTip() { tip.style.opacity = 0; }
+
+/* ---------- KPI tiles ---------- */
+function renderKpis(k) {
+  $('#kpis').innerHTML = [
+    ['Visitors', fmtNum(k.unique_visitors), 'unique in ' + k.window_days + '-day window'],
+    ['Today', fmtNum(k.today_visits), 'visit events in the last 24 h'],
+    ['Events', fmtNum(k.total_events), 'visit + exit records in window'],
+    ['Avg. time', fmtTime(k.avg_time_s * 1000), 'on the app, per session'],
+  ].map(([k2, v, s]) => '<div class="tile"><div class="k">' + k2 + '</div><div class="v">' + v + '</div><div class="s">' + s + '</div></div>').join('');
+}
+
+/* ---------- per-day line chart ---------- */
+function renderLine(daysArr) {
+  const box = $('#linebox');
+  if (!daysArr || daysArr.length < 2 || daysArr.every((d) => !d.visitors && !d.events)) {
+    box.innerHTML = '<div class="empty">No data yet — data appears as soon as the first visitor arrives.</div>';
+    return;
+  }
+  const W = 900, H = 260, padL = 44, padR = 12, padT = 12, padB = 26;
+  const s1 = cssVar('--series-1'), s2 = cssVar('--series-2');
+  const grid = cssVar('--grid'), muted = cssVar('--muted'), textC = cssVar('--text-primary');
+  const maxV = Math.max(1, ...daysArr.map((d) => Math.max(d.visitors || 0, d.events || 0)));
+  // log-ish headroom: round up to a clean value
+  const step = Math.max(1, Math.ceil(maxV / 4 / 10) * 10), top = step * 4;
+  const x = (i) => padL + i * ((W - padL - padR) / (daysArr.length - 1));
+  const y = (v) => padT + (H - padT - padB) * (1 - v / top);
+
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const v = top / 4 * i, yy = y(v);
+    g += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yy + '" y2="' + yy + '" stroke="' + grid + '" stroke-width="1"/>';
+    g += '<text x="' + (padL - 8) + '" y="' + (yy + 4) + '" font-size="11" fill="' + muted + '" text-anchor="end">' + fmtNum(v) + '</text>';
+  }
+  // x labels: first, middle, last
+  const labs = [0, Math.floor((daysArr.length - 1) / 2), daysArr.length - 1];
+  for (const i of labs) g += '<text x="' + x(i) + '" y="' + (H - 6) + '" font-size="11" fill="' + muted + '" text-anchor="middle">' + daysArr[i].day.slice(5) + '</text>';
+
+  const path = (key) => daysArr.map((d, i) => (i ? 'L' : 'M') + x(i) + ' ' + y(d[key] || 0)).join(' ');
+  const dots = (key, color) => daysArr.map((d, i) =>
+    '<circle cx="' + x(i) + '" cy="' + y(d[key] || 0) + '" r="2.5" fill="' + color + '" stroke="' + cssVar('surface-1') + '" stroke-width="1"/>').join('');
+
+  box.innerHTML = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Daily visitors and events">' +
+    g +
+    '<path d="' + path('events') + '" fill="none" stroke="' + s2 + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    '<path d="' + path('visitors') + '" fill="none" stroke="' + s1 + '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>' +
+    dots('visitors', s1) + dots('events', s2) +
+    '<line id="xh" x1="0" x2="0" y1="' + padT + '" y2="' + (H - padB) + '" stroke="' + textC + '" stroke-width="1" opacity="0"/>' +
+    '</svg>';
+
+  // hover: crosshair + tooltip
+  const svg = box.querySelector('svg'), xh = svg.querySelector('#xh');
+  svg.addEventListener('mousemove', (e) => {
+    const r = svg.getBoundingClientRect(), px = (e.clientX - r.left) * (W / r.width);
+    let i = Math.round((px - padL) / ((W - padL - padR) / (daysArr.length - 1)));
+    i = Math.max(0, Math.min(daysArr.length - 1, i));
+    const d = daysArr[i], cx = x(i);
+    xh.setAttribute('x1', cx); xh.setAttribute('x2', cx); xh.setAttribute('opacity', .55);
+    showTip(
+      '<b>' + d.day + '</b>' +
+      '<div class="l"><span class="sw" style="background:' + s1 + '"></span>New visitors ' + fmtNum(d.visitors) + '</div>' +
+      '<div class="l"><span class="sw" style="background:' + s2 + '"></span>Events ' + fmtNum(d.events) + '</div>',
+      e.clientX, e.clientY);
+  });
+  svg.addEventListener('mouseleave', () => { xh.setAttribute('opacity', 0); hideTip(); });
+}
+
+/* ---------- ranked horizontal bars (crackers, countries) ---------- */
+function rankedBars(el, items, labelKey, title) {
+  if (!items || !items.length) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
+  const max = Math.max(1, items[0].n);
+  const color = cssVar('--series-1');
+  el.innerHTML = items.map((it) => {
+    const w = Math.max(2, it.n / max * 100);
+    return '<div style="display:flex;align-items:center;gap:10px;margin:7px 0">' +
+      '<div style="flex:none;width:120px;font-size:13px;color:var(--text-secondary)">' + (it[labelKey] || 'unknown') + '</div>' +
+      '<div style="flex:1;height:14px;background:var(--grid);border-radius:4px;overflow:hidden">' +
+        '<div style="width:' + w + '%;height:100%;background:' + color + ';border-radius:4px 2px 2px 4px"></div></div>' +
+      '<div style="flex:none;width:44px;text-align:right;font-variant-numeric:tabular-nums;font-size:13px">' + fmtNum(it.n) + '</div></div>';
+  }).join('');
+}
+
+/* ---------- tall segmented bar (OS split) ---------- */
+function osSplit(el, items) {
+  if (!items || !items.length) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
+  const palette = [cssVar('--series-1'), cssVar('--series-2'), '#1baf7a', '#eda100', '#e87ba4', '#6250d6', '#008300', '#e34948'];
+  let parts = items.slice(0, 7);
+  const tail = items.length > 7;
+  if (tail) parts = parts.concat([{ os: 'Other', n: items.slice(7).reduce((a, b) => a + b.n, 0) }]);
+  const total = parts.reduce((a, b) => a + b.n, 0) || 1;
+  const seg = parts.map((p, i) => {
+    const w = p.n / total * 100;
+    const label = w >= 9 ? '<span style="font-size:11.5px;font-weight:600;color:' + (i === 3 || i === 5 ? '#0b0b0b' : '#fff') + '">' + Math.round(w) + '%</span>' : '';
+    return '<div title="' + p.os + ' · ' + fmtNum(p.n) + '" style="width:calc(' + w + '% - 2px);min-width:2px;background:' + palette[i % 8] + ';border-radius:2px;' + label ? ('height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden') : '' + '">' + label + '</div>';
+  });
+  const legend = parts.map((p, i) => '<span style="display:inline-flex;align-items:center;gap:5px;margin:0 12px 4px 0;font-size:12.5px;color:var(--text-secondary)"><span class="sw" style="background:' + palette[i % 8] + ';width:9px;height:9px;border-radius:2px;display:inline-block"></span>' + p.os + ' · ' + fmtNum(p.n) + '</span>').join('');
+  el.innerHTML = '<div style="display:flex;gap:2px;height:38px;border-radius:6px;overflow:hidden;background:var(--grid)">' + seg.join('') + '</div>' +
+    '<div style="margin-top:10px">' + legend + '</div>';
+}
+
+/* ---------- recent visitors table ---------- */
+function recentTable(el, rows) {
+  if (!rows || !rows.length) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
+  el.innerHTML = '<div style="overflow-x:auto"><table><thead><tr>' +
+    '<th>Visitor</th><th>First seen</th><th>Last seen</th><th>Visits</th><th>Time</th><th>Device</th><th>Location</th>' +
+    '</tr></thead><tbody>' +
+    rows.map((r) =>
+      '<tr><td class="num">' + r.id + '</td>' +
+      '<td class="dim">' + fmtDate(r.first_seen) + '</td>' +
+      '<td class="dim">' + fmtDate(r.last_seen) + '</td>' +
+      '<td class="num">' + fmtNum(r.visits) + '</td>' +
+      '<td class="num">' + fmtTime(r.total_time_ms) + '</td>' +
+      '<td>' + (r.model ? r.model + (r.browser ? ' · ' + r.browser : '') : (r.browser || '—')) + '</td>' +
+      '<td class="dim">' + [r.city, r.country].filter(Boolean).join(', ') || '—' + '</td></tr>').join('') +
+    '</tbody></table></div>';
+}
+
+/* ---------- load + poll ---------- */
+async function load() {
+  const dot = $('#dot'), st = $('#statustext');
+  if (!authToken) { showGate(); return; }
+  dot.className = 'dot'; st.textContent = 'syncing…';
+  try {
+    const r = await fetch('api/stats?days=' + curDays + '&token=' + encodeURIComponent(authToken), { cache: 'no-store' });
+    if (r.status === 401 || r.status === 403) { // token expired (or was tampered with)
+      authToken = '';
+      sessionStorage.removeItem(TOKEN_KEY);
+      showGate();
+      return;
+    }
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+    dot.className = 'dot on';
+    st.textContent = 'live · ' + new Date().toLocaleTimeString();
+    renderKpis(j.data.kpis);
+    renderLine(j.data.per_day);
+    rankedBars($('#crackers'), j.data.top_crackers, 'name');
+    osSplit($('#osbox'), j.data.os_split);
+    rankedBars($('#countries'), j.data.countries, 'country');
+    recentTable($('#recent'), j.data.recent);
+  } catch (e) {
+    dot.className = 'dot err';
+    st.textContent = 'error';
+    $('#kpis').innerHTML = '';
+    const msg = /not configured/i.test(e.message)
+      ? 'Supabase is not configured yet. Set <code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE</code> in the Vercel project settings, then redeploy.'
+      : e.message;
+    document.querySelectorAll('.card').forEach((c) => {
+      const ph = c.querySelector('.empty, .errbox');
+      if (ph) ph.outerHTML = '<div class="errbox">' + msg + '</div>';
+    });
+  }
+}
+load();
+setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>

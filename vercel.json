@@ -1,0 +1,14 @@
+{
+  "rewrites": [
+    {
+      "host": "stats.pataka.vercel.app",
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "host": "stats.pataka.vercel.app",
+      "source": "/(.*)",
+      "destination": "/stats"
+    }
+  ]
+}

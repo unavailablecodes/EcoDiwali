@@ -1,0 +1,1562 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0d0a16">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Diwali firecrackers through your phone's camera. Tap the sky to burst a shell, or tilt down and set off bombs and walas on the ground.">
+<title>Pataka</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%23ffae2b' stroke-width='5' stroke-linecap='round'%3E%3Cpath d='M32 6v14M32 44v14M6 32h14M44 32h14M14 14l10 10M40 40l10 10M50 14L40 24M24 40L14 50'/%3E%3C/g%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yatra+One&display=swap">
+<style>
+/* One screen: camera at the back, sparks on top, a tray of crackers in thumb reach.
+   A single night look on purpose, since it sits over a live camera. */
+:root {
+  --night: #0d0a16;
+  --tray: rgba(13, 10, 22, .62);
+  --text: #fff3e2;
+  --muted: rgba(255, 243, 226, .66);
+  --marigold: #ffae2b;
+  --font-title: "Yatra One", Georgia, serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--night); color: var(--text); font-family: var(--font-ui); font-size: 16px; line-height: 1.4;
+  overflow: hidden; overscroll-behavior: none; touch-action: none; -webkit-font-smoothing: antialiased;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; }
+button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+
+#stage { position: fixed; inset: 0; overflow: hidden; }
+#scene { position: absolute; inset: 0; }
+#cam, #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#cam { object-fit: cover; background: var(--night); }
+
+#top {
+  position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) calc(env(safe-area-inset-right, 0px) + 14px) 0 calc(env(safe-area-inset-left, 0px) + 14px);
+}
+#mode, #surfaceBtn, #catBtn { padding: 7px 12px; border: 0; border-radius: 999px; background: var(--tray); font-size: 14px; font-weight: 600; }
+#surfaceBtn { cursor: pointer; font-weight: 500; }
+#catBtn { cursor: pointer; }
+#catBtn[aria-pressed="true"] { background: var(--marigold); color: #1a1205; }
+.spacer { flex: 1; }
+.round { width: 42px; height: 42px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--tray); cursor: pointer; }
+.round svg { width: 20px; height: 20px; stroke: var(--text); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+#hint {
+  position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 118px); transform: translateX(-50%);
+  width: max-content; max-width: calc(100vw - 32px); padding: 8px 14px; border-radius: 10px; background: var(--tray);
+  font-size: 15px; text-align: center; opacity: 0; transition: opacity .35s; pointer-events: none;
+}
+#hint.show { opacity: 1; }
+
+#picker {
+  position: absolute; left: 0; right: 0; bottom: 0; display: flex; gap: 8px; overflow-x: auto; touch-action: pan-x; scrollbar-width: none;
+  padding: 8px calc(env(safe-area-inset-right, 0px) + 12px) calc(env(safe-area-inset-bottom, 0px) + 14px) calc(env(safe-area-inset-left, 0px) + 12px);
+}
+#picker::-webkit-scrollbar { display: none; }
+.pick {
+  flex: none; width: 76px; display: grid; justify-items: center; gap: 3px; padding: 9px 4px 8px; border: 0; border-radius: 14px; cursor: pointer;
+  background: var(--tray); font-size: 12.5px; white-space: nowrap;
+}
+.pick svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.pick[aria-pressed="true"] { background: var(--marigold); color: #1a1205; font-weight: 600; }
+
+#start {
+  position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 18vh) 24px calc(env(safe-area-inset-bottom, 0px) + 56px);
+}
+#start small { display: block; margin-bottom: 4px; font-size: 15px; color: var(--marigold); }
+#start h1 { margin: 0 0 10px; font-family: var(--font-title); font-weight: 400; font-size: clamp(44px, 13vw, 60px); line-height: 1.1; }
+#start p { margin: 0 0 24px; max-width: 30ch; font-size: 16px; color: var(--muted); }
+#startBtn { display: block; width: min(220px, 100%); padding: 14px 20px; border: 0; border-radius: 12px; background: var(--marigold); color: #1a1205; font-size: 17px; font-weight: 600; cursor: pointer; }
+#startBtn:disabled { opacity: .6; }
+#start .fine { margin: 14px 0 0; font-size: 13px; }
+#start #credit { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); max-width: none; margin: 0; font-size: 13px; }
+#bootError { position: fixed; inset: auto 16px 20px; z-index: 20; padding: 12px 14px; border-radius: 10px; background: #231b33; font-size: 15px; }
+#safeWarn {
+  position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 64px); transform: translateX(-50%);
+  width: max-content; max-width: calc(100vw - 24px); padding: 10px 14px; border-radius: 12px;
+  background: rgba(86, 20, 18, .9); border: 1px solid rgba(255, 150, 100, .5);
+  font-size: 13.5px; text-align: center; line-height: 1.4;
+}
+#safeWarn strong { color: #ffd9a0; }
+
+@media (prefers-reduced-motion: reduce) { #hint { transition: none; } }
+</style>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+
+<div id="stage">
+  <div id="scene">
+    <video id="cam" playsinline muted autoplay></video>
+    <canvas id="gl"></canvas>
+  </div>
+  <div id="ui" hidden>
+    <div id="top">
+      <div id="mode">Sky</div>
+      <button id="catBtn" type="button">Floor</button>
+      <button id="surfaceBtn" type="button" hidden>On the floor</button>
+      <div class="spacer"></div>
+      <button class="round" id="hideBtn" type="button" aria-label="Hide controls for recording">
+        <svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.2A10 10 0 0 1 12 5c6 0 9.500 7 9.500 7a16 16 0 0 1-3.200 4M6.300 6.800A16 16 0 0 0 2.500 12S6 19 12 19a9.500 9.500 0 0 0 4.100-.9"/><path d="M9.900 9.900a3 3 0 0 0 4.200 4.200"/></svg>
+      </button>
+      <button class="round" id="muteBtn" type="button" aria-label="Mute sound">
+        <svg viewBox="0 0 24 24" id="icoSound"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>
+        <svg viewBox="0 0 24 24" id="icoMuted" hidden><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
+      </button>
+    </div>
+    <div id="picker" role="toolbar" aria-label="Firecrackers"></div>
+  </div>
+  <div id="hint" role="status"></div>
+  <div id="safeWarn" role="alert" hidden></div>
+</div>
+
+<section id="start" aria-labelledby="title">
+  <small>Happy Diwali</small>
+  <h1 id="title">Pataka</h1>
+  <p id="lede">Tap the sky to burst a firework. Tilt down to set off bombs.</p>
+  <button id="startBtn" type="button">Start</button>
+  <p class="fine" id="note" hidden></p>
+  <p id="credit">Created by Deepshikha Mohanta</p>
+</section>
+<div id="bootError" hidden>This needs a connection the first time it loads. Check yours and reload.</div>
+
+<script>
+  setTimeout(function () { if (!window.__ready) document.getElementById('bootError').hidden = false; }, 9000);
+</script>
+<!-- Object detection: safety check for plants, vehicles, pets. Runs on-device; the camera
+     feed is never uploaded. Model weights stream in with first load (the app already needs
+     a connection the first time). -->
+<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+
+<script type="module">
+import * as THREE from 'three';
+THREE.ColorManagement.enabled = false; // everything here is hand-graded, so it goes to the screen as written
+
+const $ = (id) => document.getElementById(id);
+const TAU = Math.PI * 2, DEG = Math.PI / 180;
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const vibrate = (p) => { try { navigator.vibrate && navigator.vibrate(p); } catch (e) { /* unsupported */ } };
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const FLOOR_H = 1.4, TABLE_H = .45; // how far below the phone the surface is, in metres
+let floorY = -FLOOR_H;
+const used = {}; // cracker id -> number of times set off, reported on exit
+// Roughly what each metal salt burns like: strontium red, barium green, copper blue, sodium gold, charcoal amber.
+const C = {
+  gold: [1, .74, .3], amber: [1, .4, .06], charcoal: [.9, .3, .05], red: [1, .13, .1], pink: [1, .18, .5],
+  green: [.3, 1, .38], blue: [.32, .5, 1], violet: [.72, .32, 1], silver: [.92, .95, 1], white: [1, .96, .88],
+  teal: [.16, .9, .82], orange: [1, .46, .1], magenta: [1, .3, .95],
+};
+const PAIRS = [[C.gold, C.red], [C.pink, C.silver], [C.green, C.gold], [C.blue, C.silver], [C.red, C.gold], [C.violet, C.gold], [C.silver, C.red],
+[C.teal, C.gold], [C.orange, C.white], [C.magenta, C.gold], [C.teal, C.red], [C.blue, C.green], [C.orange, C.magenta], [C.teal, C.violet]];
+
+/* ---------- Renderer ---------- */
+const stage = $('stage'), sceneEl = $('scene'), video = $('cam'), glCanvas = $('gl');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: glCanvas, antialias: false, alpha: false, powerPreference: 'high-performance', preserveDrawingBuffer: false });
+} catch (err) {
+  $('bootError').textContent = "This browser couldn't start WebGL, which the fireworks need.";
+  $('bootError').hidden = false;
+  throw err;
+}
+renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+renderer.setClearColor(0x000000, 1);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 900);
+scene.add(camera);
+
+// Painted night, used on the start screen and when there is no camera.
+function buildNight() {
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 1024;
+  const x = c.getContext('2d');
+  const sky = x.createLinearGradient(0, 0, 0, 1024);
+  sky.addColorStop(0, '#07060f'); sky.addColorStop(.5, '#151029'); sky.addColorStop(.62, '#0d0a16'); sky.addColorStop(1, '#0d0a16');
+  x.fillStyle = sky; x.fillRect(0, 0, 2048, 1024);
+  for (let i = 0; i < 260; i++) {
+    x.fillStyle = `rgba(255,245,230,${rand(.12, .55)})`;
+    x.beginPath(); x.arc(Math.random() * 2048, Math.random() * 470, rand(.4, .8), 0, TAU); x.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace;
+  const m = new THREE.Mesh(new THREE.SphereGeometry(800, 48, 24), new THREE.MeshBasicMaterial({ map: t, side: THREE.BackSide, depthWrite: false, toneMapped: false }));
+  m.renderOrder = -10;
+  return m;
+}
+const night = buildNight();
+scene.add(night);
+
+/* ---------- Light that falls on the real picture ----------
+   The camera image is also a texture, so a burst can genuinely brighten the floor and walls the
+   phone is looking at, grain and all, rather than laying a coloured glow on top of them. */
+const shared = {
+  uVideo: { value: null }, uHas: { value: 0 }, uRes: { value: new THREE.Vector2(1, 1) }, uCov: { value: new THREE.Vector2(1, 1) },
+};
+const ADD = { transparent: true, depthTest: false, depthWrite: false, toneMapped: false, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor };
+const SAMPLE = `
+  uniform sampler2D uVideo; uniform float uHas; uniform vec2 uRes; uniform vec2 uCov;
+  vec3 room() { vec2 uv = (gl_FragCoord.xy / uRes - 0.5) * uCov + 0.5; return texture2D(uVideo, uv).rgb; }`;
+// The feed is drawn in here too, rather than left under a see-through canvas, so sparks add to it the same way in every browser.
+const camGain = { value: .8 };
+const backdrop = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  depthTest: false, depthWrite: false, toneMapped: false,
+  uniforms: { ...shared, uGain: camGain },
+  vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `${SAMPLE} uniform float uGain; void main(){ gl_FragColor = vec4(room() * uGain, 1.0); }`,
+}));
+backdrop.frustumCulled = false; backdrop.renderOrder = -20; backdrop.visible = false;
+scene.add(backdrop);
+const skyLight = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), new THREE.ShaderMaterial({
+  ...ADD,
+  uniforms: { ...shared, uC: { value: new THREE.Color(0, 0, 0) } },
+  vertexShader: 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }',
+  fragmentShader: `${SAMPLE} uniform vec3 uC;
+    void main(){ vec3 c = uHas > .5 ? room() * uC * 1.5 : uC * .1; gl_FragColor = vec4(c, 0.0); }`,
+}));
+skyLight.frustumCulled = false; skyLight.renderOrder = 0; skyLight.visible = false;
+scene.add(skyLight);
+let sceneLight = 0;
+const sceneLightC = new THREE.Vector3();
+function lightScene(c, amt) {
+  if (amt < sceneLight * .6) return;
+  sceneLight = Math.max(sceneLight, amt);
+  sceneLightC.set(c[0], c[1], c[2]);
+}
+
+const FLOOR_GEO = new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2);
+const pools = [];
+for (let i = 0; i < 8; i++) {
+  const m = new THREE.Mesh(FLOOR_GEO, new THREE.ShaderMaterial({
+    ...ADD,
+    uniforms: { ...shared, uC: { value: new THREE.Color() } },
+    vertexShader: 'varying vec2 vP; void main(){ vP = position.xz; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `${SAMPLE} uniform vec3 uC; varying vec2 vP;
+      void main(){
+        float r = length(vP); if (r >= 1.0) discard;
+        float f = 1.0 - r; f = f * f * (1.0 + 2.0 * f);
+        vec3 c = uHas > .5 ? room() * uC * f * 1.15 + uC * f * .03 : uC * f * .34;
+        gl_FragColor = vec4(c, 0.0);
+      }`,
+  }));
+  m.frustumCulled = false; m.renderOrder = 1; m.visible = false;
+  scene.add(m);
+  pools.push(m);
+}
+let poolN = 0;
+function floorGlow(x, z, c, intensity, radius) {
+  if (poolN >= pools.length) return;
+  const m = pools[poolN++];
+  m.position.set(x, floorY + .004, z);
+  m.scale.setScalar(radius);
+  m.material.uniforms.uC.value.setRGB(c[0] * intensity, c[1] * intensity, c[2] * intensity);
+  m.visible = true;
+}
+const pulses = [];
+const floorPulse = (x, z, c, intensity, radius, decay) => pulses.push({ x, z, c, i: intensity, r: radius, d: decay });
+
+/* ---------- Sparks: stretched along their motion, the way a camera shutter records them ---------- */
+const N = 10000;
+const F = { TRAIL: 1, TWINKLE: 2, BOUNCE: 4, CRACKLE: 8, LATE: 16, SEG: 32, SPLIT: 64 };
+const P = {};
+for (const k of ['x', 'y', 'z', 'vx', 'vy', 'vz', 'age', 'life', 'size', 'r', 'g', 'b', 'r2', 'g2', 'b2', 'drag', 'grav', 'tl', 'tt', 'str', 'glow']) P[k] = new Float32Array(N);
+P.flag = new Uint8Array(N);
+let head = 0, aliveCount = 0;
+const outPos = new Float32Array(N * 3), outVel = new Float32Array(N * 3), outCol = new Float32Array(N * 4), outSize = new Float32Array(N * 3);
+const QUAD = new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), QUAD_I = [0, 1, 2, 0, 2, 3];
+function instanced(...attrs) {
+  const g = new THREE.InstancedBufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(QUAD, 3));
+  g.setIndex(QUAD_I);
+  for (const [name, arr, size] of attrs) g.setAttribute(name, new THREE.InstancedBufferAttribute(arr, size).setUsage(THREE.DynamicDrawUsage));
+  g.instanceCount = 0;
+  return g;
+}
+const sparkGeo = instanced(['iPos', outPos, 3], ['iVel', outVel, 3], ['iCol', outCol, 4], ['iSize', outSize, 3]);
+const sparkMat = new THREE.ShaderMaterial({
+  ...ADD,
+  uniforms: { uScale: { value: 1000 }, uMin: { value: 1.5 }, uRes: shared.uRes },
+  vertexShader: `
+    attribute vec3 iPos; attribute vec3 iVel; attribute vec4 iCol; attribute vec3 iSize;
+    uniform float uScale; uniform float uMin; uniform vec2 uRes;
+    varying vec4 vC; varying vec2 vP; varying float vH; varying float vR; varying float vG;
+    void main() {
+      vec4 a = viewMatrix * vec4(iPos, 1.0);
+      if (a.z > -0.04) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+      vec4 b = viewMatrix * vec4(iPos - iVel * iSize.y, 1.0);
+      if (b.z > -0.04) b = a;
+      vec4 pa = projectionMatrix * a, pb = projectionMatrix * b;
+      vec2 sa = pa.xy / pa.w * uRes * 0.5, sb = pb.xy / pb.w * uRes * 0.5;
+      float r = clamp(iSize.x * uScale / -a.z, uMin, 520.0);
+      vec2 d = sa - sb; float len = length(d);
+      vec2 ux = len > 0.01 ? d / len : vec2(1.0, 0.0), uy = vec2(-ux.y, ux.x);
+      float h = len * 0.5;
+      vec2 s = (sa + sb) * 0.5 + ux * position.x * (h + r) + uy * position.y * r;
+      gl_Position = vec4(s / (uRes * 0.5) * pa.w, pa.z, pa.w);
+      vP = vec2(position.x * (h + r), position.y * r); vH = h; vR = r; vC = iCol; vG = iSize.z;
+    }`,
+  fragmentShader: `
+    varying vec4 vC; varying vec2 vP; varying float vH; varying float vR; varying float vG;
+    void main() {
+      float d = length(vec2(max(abs(vP.x) - vH, 0.0), vP.y)) / vR;
+      if (d >= 1.0) discard;
+      float halo = pow(1.0 - d, 3.0);
+      float core = smoothstep(0.36, 0.02, d);
+      float along = vH > 0.5 ? clamp((vP.x + vH) / (2.0 * vH), 0.0, 1.0) : 1.0;
+      vec3 c = vG > 0.5
+        ? vC.rgb * halo * halo
+        : vC.rgb * halo * 0.9 + mix(vC.rgb, vec3(1.0, 0.97, 0.92), 0.38) * core * 1.15;
+      float fade = vG < -0.5 ? 1.0 : mix(0.12, 1.0, along * along);
+      gl_FragColor = vec4(c * vC.a * fade, 0.0);
+    }`,
+});
+const sparks = new THREE.Mesh(sparkGeo, sparkMat);
+sparks.frustumCulled = false; sparks.renderOrder = 3;
+scene.add(sparks);
+
+function spawn(x, y, z, vx, vy, vz, life, size, c1, c2, drag, grav, flag = 0, tl = 0, str = .033, glow = 0) {
+  const i = head; head = (head + 1) % N;
+  P.x[i] = x; P.y[i] = y; P.z[i] = z; P.vx[i] = vx; P.vy[i] = vy; P.vz[i] = vz;
+  P.age[i] = 0; P.life[i] = life; P.size[i] = size;
+  P.r[i] = c1[0]; P.g[i] = c1[1]; P.b[i] = c1[2]; P.r2[i] = c2[0]; P.g2[i] = c2[1]; P.b2[i] = c2[2];
+  P.drag[i] = drag; P.grav[i] = grav; P.flag[i] = flag; P.tl[i] = tl; P.tt[i] = 0; P.str[i] = str; P.glow[i] = glow;
+  return i;
+}
+let quality = 1;
+function updateSparks(dt) {
+  let n = 0;
+  const room = aliveCount < N * .78;
+  const trailGap = quality > .8 ? .03 : .05;
+  for (let i = 0; i < N; i++) {
+    if (P.life[i] <= 0) continue;
+    P.age[i] += dt;
+    const fl = P.flag[i];
+    if (P.age[i] >= P.life[i]) {
+      if (fl & F.CRACKLE) {
+        const s = P.size[i];
+        for (let k = 0; k < 6; k++) { const d = randDir(), v = rand(6, 16) * s; spawn(P.x[i], P.y[i], P.z[i], d[0] * v, d[1] * v, d[2] * v, rand(.1, .24), s * .5, C.white, C.gold, 3, 2, F.TWINKLE); }
+        spawn(P.x[i], P.y[i], P.z[i], 0, 0, 0, .07, s * 3, C.white, C.gold, 0, 0, 0, 0, 0, 1);
+      }
+      if (fl & F.SPLIT) {
+        // Red crossettes: each star bursts once more into a small cluster of twinkles.
+        const s = P.size[i];
+        for (let k = 0; k < 4; k++) { const d = randDir(); spawn(P.x[i], P.y[i], P.z[i], d[0] * rand(1.5, 3.5), d[1] * rand(1.5, 3.5), d[2] * rand(1.5, 3.5), rand(.7, 1.1), s * .85, C.white, C.red, 2.2, 3.5, F.TWINKLE); }
+      }
+      P.life[i] = 0;
+      continue;
+    }
+    if (fl & F.SEG) P.y[i] -= P.grav[i] * P.age[i] * dt; // a trail piece stays put and only sags; its velocity just sets its length
+    else {
+      const damp = Math.exp(-P.drag[i] * dt);
+      P.vx[i] *= damp; P.vy[i] = P.vy[i] * damp - P.grav[i] * dt; P.vz[i] *= damp;
+      P.x[i] += P.vx[i] * dt; P.y[i] += P.vy[i] * dt; P.z[i] += P.vz[i] * dt;
+    }
+    if ((fl & F.BOUNCE) && P.y[i] < floorY) { P.y[i] = floorY; P.vy[i] *= -.32; P.vx[i] *= .55; P.vz[i] *= .55; }
+    const k = P.age[i] / P.life[i];
+    const r = P.r[i] + (P.r2[i] - P.r[i]) * k, g = P.g[i] + (P.g2[i] - P.g[i]) * k, b = P.b[i] + (P.b2[i] - P.b[i]) * k;
+    // Stars burn steadily and then gutter out; loose sparks just fade.
+    let a = (fl & F.LATE) ? (k < .8 ? .94 + Math.random() * .06 : Math.pow(1 - (k - .8) / .2, 1.6)) : 1 - k * k;
+    if (fl & F.TWINKLE) a *= Math.random() < .42 ? 1.25 : .16;
+    if ((fl & F.TRAIL) && room) {
+      P.tt[i] -= dt;
+      if (P.tt[i] <= 0) {
+        P.tt[i] = trailGap;
+        spawn(P.x[i], P.y[i], P.z[i], P.vx[i], P.vy[i], P.vz[i], P.tl[i] * rand(.7, 1.1), P.size[i] * .46, [r * .95, g * .72, b * .5], C.charcoal, 0, P.grav[i] * .16, F.SEG, 0, Math.max(trailGap, dt) * 1.25, -1);
+      }
+    }
+    outPos[n * 3] = P.x[i]; outPos[n * 3 + 1] = P.y[i]; outPos[n * 3 + 2] = P.z[i];
+    outVel[n * 3] = P.vx[i]; outVel[n * 3 + 1] = P.vy[i]; outVel[n * 3 + 2] = P.vz[i];
+    outCol[n * 4] = r; outCol[n * 4 + 1] = g; outCol[n * 4 + 2] = b; outCol[n * 4 + 3] = a;
+    outSize[n * 3] = P.size[i]; outSize[n * 3 + 1] = P.str[i]; outSize[n * 3 + 2] = P.glow[i];
+    n++;
+  }
+  aliveCount = n;
+  sparkGeo.instanceCount = n;
+  for (const name of ['iPos', 'iVel', 'iCol', 'iSize']) sparkGeo.attributes[name].needsUpdate = true;
+}
+
+/* ---------- Smoke, and the paper a cracker leaves behind ---------- */
+const M = 1400;
+const S = {};
+for (const k of ['x', 'y', 'z', 'vx', 'vy', 'vz', 'age', 'life', 'size', 'grow', 'rot', 'spin', 'r', 'g', 'b', 'r2', 'g2', 'b2', 'a', 'drag', 'grav', 'wind', 'hard']) S[k] = new Float32Array(M);
+let sHead = 0;
+const sPos = new Float32Array(M * 3), sCol = new Float32Array(M * 4), sSize = new Float32Array(M * 3);
+const smokeGeo = instanced(['iPos', sPos, 3], ['iCol', sCol, 4], ['iSize', sSize, 3]);
+const smokeTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d');
+  for (let i = 0; i < 90; i++) {
+    const a = rand(0, TAU), r = Math.pow(Math.random(), .7) * 36, px = 64 + Math.cos(a) * r, py = 64 + Math.sin(a) * r, s = rand(10, 26);
+    const g = x.createRadialGradient(px, py, 0, px, py, s);
+    g.addColorStop(0, 'rgba(255,255,255,.2)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(px - s, py - s, s * 2, s * 2);
+  }
+  return new THREE.CanvasTexture(c);
+})();
+const smokeMat = new THREE.ShaderMaterial({
+  uniforms: { uTex: { value: smokeTex } },
+  transparent: true, depthTest: false, depthWrite: false, toneMapped: false,
+  blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor,
+  vertexShader: `
+    attribute vec3 iPos; attribute vec4 iCol; attribute vec3 iSize;
+    varying vec2 vUv; varying vec4 vC; varying float vHard;
+    void main() {
+      vUv = position.xy * 0.5 + 0.5; vC = iCol; vHard = iSize.z;
+      float c = cos(iSize.y), s = sin(iSize.y);
+      vec4 mv = viewMatrix * vec4(iPos, 1.0);
+      mv.xy += vec2(position.x * c - position.y * s, position.x * s + position.y * c) * iSize.x;
+      gl_Position = projectionMatrix * mv;
+    }`,
+  fragmentShader: `
+    uniform sampler2D uTex; varying vec2 vUv; varying vec4 vC; varying float vHard;
+    void main() {
+      float a = vC.a;
+      if (vHard > 0.5) { // torn paper: a thin, ragged shred
+        vec2 p = (vUv - 0.5) * 2.0;
+        if (max(abs(p.x), abs(p.y) * 2.2) + 0.22 * sin(p.x * 7.0 + p.y * 11.0) > 0.8) discard;
+      } else a *= texture2D(uTex, vUv).a;
+      gl_FragColor = vec4(vC.rgb * a, a);
+    }`,
+});
+const smoke = new THREE.Mesh(smokeGeo, smokeMat);
+smoke.frustumCulled = false; smoke.renderOrder = 2;
+scene.add(smoke);
+function puff(x, y, z, vx, vy, vz, life, size, grow, lit, base, alpha, drag, grav, wind, hard = 0) {
+  const i = sHead; sHead = (sHead + 1) % M;
+  S.x[i] = x; S.y[i] = y; S.z[i] = z; S.vx[i] = vx; S.vy[i] = vy; S.vz[i] = vz; S.age[i] = 0; S.life[i] = life; S.size[i] = size; S.grow[i] = grow;
+  S.rot[i] = rand(0, TAU); S.spin[i] = rand(-.5, .5) * (hard ? 12 : 1);
+  S.r[i] = lit[0]; S.g[i] = lit[1]; S.b[i] = lit[2]; S.r2[i] = base[0]; S.g2[i] = base[1]; S.b2[i] = base[2];
+  S.a[i] = alpha; S.drag[i] = drag; S.grav[i] = grav; S.wind[i] = wind; S.hard[i] = hard;
+}
+function updateSmoke(dt) {
+  let n = 0;
+  for (let i = 0; i < M; i++) {
+    if (S.life[i] <= 0) continue;
+    S.age[i] += dt;
+    if (S.age[i] >= S.life[i]) { S.life[i] = 0; continue; }
+    const damp = Math.exp(-S.drag[i] * dt);
+    S.vx[i] *= damp; S.vy[i] = S.vy[i] * damp - S.grav[i] * dt; S.vz[i] *= damp;
+    S.x[i] += (S.vx[i] + S.wind[i]) * dt; S.y[i] += S.vy[i] * dt; S.z[i] += (S.vz[i] + S.wind[i] * .4) * dt;
+    const hard = S.hard[i] > .5;
+    if (hard) {
+      if (S.y[i] <= floorY + .002) { S.y[i] = floorY + .002; S.vx[i] = S.vz[i] = S.vy[i] = 0; S.spin[i] = 0; S.grav[i] = 0; S.wind[i] = 0; }
+      S.rot[i] += S.spin[i] * dt;
+    } else {
+      S.rot[i] += S.spin[i] * dt;
+      S.size[i] += S.grow[i] * dt;
+    }
+    const k = S.age[i] / S.life[i], m = hard ? 0 : Math.min(1, k * 4);
+    const lift = hard ? clamp(ambLum * 2.6, .28, 1.05) : 1;
+    sPos[n * 3] = S.x[i]; sPos[n * 3 + 1] = S.y[i]; sPos[n * 3 + 2] = S.z[i];
+    sCol[n * 4] = (S.r[i] + (S.r2[i] - S.r[i]) * m) * lift; sCol[n * 4 + 1] = (S.g[i] + (S.g2[i] - S.g[i]) * m) * lift; sCol[n * 4 + 2] = (S.b[i] + (S.b2[i] - S.b[i]) * m) * lift;
+    sCol[n * 4 + 3] = S.a[i] * (hard ? (k < .85 ? 1 : 1 - (k - .85) / .15) : Math.min(1, k * 7) * (1 - k));
+    sSize[n * 3] = S.size[i]; sSize[n * 3 + 1] = S.rot[i]; sSize[n * 3 + 2] = S.hard[i];
+    n++;
+  }
+  smokeGeo.instanceCount = n;
+  for (const name of ['iPos', 'iCol', 'iSize']) smokeGeo.attributes[name].needsUpdate = true;
+}
+
+/* ---------- Sound, all synthesized ---------- */
+let actx = null, master = null, noiseBuf = null, verbIn = null, muted = false;
+function ensureAudio() {
+  if (!actx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* older Safari: the silent switch mutes it */ }
+    actx = new AC();
+    master = actx.createGain();
+    master.gain.value = muted ? 0 : .9;
+    const comp = actx.createDynamicsCompressor();
+    comp.threshold.value = -14; comp.ratio.value = 5; comp.attack.value = .002; comp.release.value = .18;
+    master.connect(comp); comp.connect(actx.destination);
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    // An open street: a few hard slaps off nearby buildings, then a long dull tail.
+    const len = Math.floor(actx.sampleRate * 3.2), ir = actx.createBuffer(2, len, actx.sampleRate);
+    for (let ch = 0; ch < 2; ch++) {
+      const o = ir.getChannelData(ch);
+      let lp = 0;
+      for (let i = 0; i < len; i++) {
+        const t = i / actx.sampleRate;
+        lp += ((Math.random() * 2 - 1) - lp) * clamp(.5 - t * .16, .05, .5);
+        o[i] = lp * Math.pow(1 - i / len, 2.6) * .8;
+      }
+      for (const [at, g] of [[.07, .7], [.13, .5], [.21, .45], [.34, .3], [.52, .2]]) {
+        const s = Math.floor((at + rand(0, .02)) * actx.sampleRate);
+        for (let i = 0; i < 700; i++) o[s + i] += (Math.random() * 2 - 1) * g * (1 - i / 700);
+      }
+    }
+    const verb = actx.createConvolver();
+    verb.buffer = ir;
+    verbIn = actx.createGain();
+    verbIn.connect(verb); verb.connect(master);
+  }
+  if (actx.state !== 'running') actx.resume(); // iOS parks it as "interrupted" when the camera starts
+}
+addEventListener('touchend', () => { if (playing) ensureAudio(); }, { passive: true });
+function route(node, pan, wet) {
+  let out = node;
+  if (actx.createStereoPanner) { const p = actx.createStereoPanner(); p.pan.value = clamp(pan || 0, -1, 1); node.connect(p); out = p; }
+  out.connect(master);
+  if (wet) { const w = actx.createGain(); w.gain.value = wet; out.connect(w); w.connect(verbIn); }
+}
+function tone({ type = 'sine', f0, f1 = f0, dur, vol, pan = 0, wet = 0, delay = 0 }) {
+  if (!actx || muted) return;
+  const t = actx.currentTime + delay;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + .004);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  o.connect(g); route(g, pan, wet);
+  o.start(t); o.stop(t + dur + .05);
+}
+function noise({ dur, vol, f0, f1 = f0, type = 'lowpass', q = .7, pan = 0, wet = 0, delay = 0, attack = .003, hold = false }) {
+  if (!actx || muted) return;
+  const t = actx.currentTime + delay;
+  const s = actx.createBufferSource(), f = actx.createBiquadFilter(), g = actx.createGain();
+  s.buffer = noiseBuf; s.loop = true;
+  f.type = type; f.Q.value = q;
+  f.frequency.setValueAtTime(f0, t);
+  f.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+  g.gain.setValueAtTime(.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + attack);
+  if (hold) g.gain.setValueAtTime(vol, t + dur * .82);
+  g.gain.exponentialRampToValueAtTime(.0001, t + dur);
+  s.connect(f); f.connect(g); route(g, pan, wet);
+  s.start(t, Math.random() * 1.5); s.stop(t + dur + .05);
+}
+const sfx = {
+  // Launch tube: a soft low thump from nearby.
+  lift(pan) { noise({ dur: .22, vol: .3, f0: 520, f1: 120, pan, wet: .12 }); tone({ f0: 170, f1: 62, dur: .16, vol: .32, pan }); },
+  // A rocket leaving: a hiss that thins out as it climbs away.
+  fizz(dur, pan) { noise({ dur, vol: .22, f0: 5400, f1: 1900, type: 'bandpass', q: .8, pan, attack: .04, wet: .35 }); },
+  // A shell bursting high up: a sharp crack, a heavy body, then the street answers. You hear it after you see it.
+  burst(p, size = 1) {
+    const dist = p.length(), delay = clamp(dist / 340, .18, .55), pan = panFor(p);
+    noise({ dur: .05, vol: .7, f0: 3200, type: 'highpass', pan, wet: .9, delay });
+    noise({ dur: .75 * size, vol: .6, f0: 1500, f1: 95, pan, wet: 1.1, delay });
+    tone({ f0: 78, f1: 30, dur: .85 * size, vol: .75 * size, pan, wet: .5, delay });
+    return delay;
+  },
+  // A rocket's payload is small: all crack and very little body.
+  crack(p) {
+    const delay = clamp(p.length() / 340, .18, .55), pan = panFor(p);
+    noise({ dur: .04, vol: .8, f0: 3800, type: 'highpass', pan, wet: .9, delay });
+    noise({ dur: .28, vol: .4, f0: 1800, f1: 240, pan, wet: .8, delay });
+    tone({ f0: 140, f1: 60, dur: .18, vol: .3, pan, wet: .3, delay });
+  },
+  crackle(n, pan, start, spread) {
+    let t = start;
+    for (let i = 0; i < n; i++) {
+      t += Math.random() < .22 ? rand(.02, .09) : rand(.002, .012);
+      if (t > start + spread) t = start + Math.random() * spread;
+      noise({ dur: .018, vol: rand(.05, .2), f0: rand(2200, 7500), type: 'bandpass', q: 1.2, pan: pan + rand(-.15, .15), wet: .35, delay: t });
+    }
+  },
+  sizzle(dur, pan, delay) { noise({ dur, vol: .09, f0: 7200, f1: 3400, type: 'highpass', pan, delay, attack: .4, wet: .4 }); },
+  pop(pan, delay, v = 1) {
+    noise({ dur: .035, vol: .55 * v, f0: 1800, type: 'highpass', pan, wet: .3, delay });
+    noise({ dur: .07, vol: .4 * v, f0: 2800, f1: 500, pan, wet: .3, delay });
+    tone({ f0: 210, f1: 80, dur: .05, vol: .2 * v, pan, delay });
+  },
+  fuse(dur, pan) { noise({ dur, vol: .13, f0: 7500, f1: 5200, type: 'highpass', pan, hold: true }); this.crackle(Math.floor(dur * 24), pan, 0, dur); },
+  bomb(pan, power = 1) {
+    const body = .55 + .45 * power;
+    noise({ dur: .07, vol: body, f0: 1400, type: 'highpass', pan, wet: 1 });
+    noise({ dur: .5 + .8 * power, vol: .95 * body, f0: 3600, f1: 60, pan, wet: .5 + .6 * power });
+    tone({ f0: 150 - 58 * power, f1: 55 - 30 * power, dur: .4 + .8 * power, vol: body, pan, wet: .4 });
+    if (power > .5) tone({ type: 'sawtooth', f0: 64, f1: 24, dur: .45, vol: .4 * power, pan });
+  },
+  // Someone else's Diwali, a few streets away.
+  distant() {
+    const pan = rand(-.9, .9), r = Math.random();
+    if (r < .3) {
+      const n = 8 + Math.floor(rand(0, 22));
+      for (let i = 0; i < n; i++) { const delay = i * rand(.05, .08) + rand(0, .03); noise({ dur: .05, vol: rand(.03, .07), f0: 900, f1: 300, pan, wet: 1.3, delay }); }
+    } else {
+      noise({ dur: .6, vol: rand(.05, .11), f0: 420, f1: 80, pan, wet: 1.5 });
+      tone({ f0: 60, f1: 30, dur: .55, vol: rand(.05, .14), pan, wet: .8 });
+    }
+  },
+};
+/* ---------- Where things are ---------- */
+const fwd = new THREE.Vector3();
+let W = 1, H = 1, dpr = 1;
+const tmp = new THREE.Vector3();
+function rayAt(cx, cy) { return new THREE.Vector3((cx / W) * 2 - 1, -(cy / H) * 2 + 1, .5).unproject(camera).sub(camera.position).normalize(); }
+function floorPoint(ray) {
+  let x, z;
+  if (ray.y < -.03) { const t = floorY / ray.y; x = ray.x * t; z = ray.z * t; }
+  else { const h = Math.hypot(ray.x, ray.z) || 1; x = ray.x / h * 7; z = ray.z / h * 7; }
+  const d = Math.hypot(x, z);
+  if (d > 8) { x *= 8 / d; z *= 8 / d; }
+  return new THREE.Vector3(x, floorY, z);
+}
+function panFor(p) { tmp.copy(p).applyMatrix4(camera.matrixWorldInverse); return clamp(tmp.x / Math.max(1, tmp.length()), -1, 1) * .85; }
+function randDir() { const u = Math.random() * 2 - 1, t = Math.random() * TAU, s = Math.sqrt(1 - u * u); return [Math.cos(t) * s, u, Math.sin(t) * s]; }
+
+/* ---------- Sky shells ---------- */
+const emitters = [];
+let shake = 0;
+const glowAt = (p, size, c, life) => spawn(p.x, p.y, p.z, 0, 0, 0, life, size, c, c, 0, 0, 0, 0, 0, 1);
+const SMOKE_BASE = [.14, .13, .135];
+function shellSmoke(p, R, c, n = 16) {
+  for (let i = 0; i < n * quality; i++) {
+    const d = randDir(), r = R * Math.pow(Math.random(), .5) * .7;
+    puff(p.x + d[0] * r, p.y + d[1] * r, p.z + d[2] * r, d[0] * 3, d[1] * 3, d[2] * 3, rand(4.5, 7.5), R * rand(.26, .4), R * .06, [c[0] * .75, c[1] * .75, c[2] * .75], SMOKE_BASE, rand(.11, .2), .8, .05, 3.2);
+  }
+}
+function burstCommon(p, R, c1, silent, size = 1) {
+  glowAt(p, R * 1.5, c1, .16);
+  glowAt(p, R * .7, C.white, .09);
+  lightScene(c1, .13 * size);
+  shellSmoke(p, R, c1);
+  return silent ? .3 : sfx.burst(p, size);
+}
+function shellStars(p, n, R, k, life, size, c1, c2, grav, flag, tl) {
+  // Stars are packed evenly inside a real shell, so the break is a clean sphere rather than random clumps.
+  const v = R * k, count = Math.floor(n * (quality > .8 ? 1 : .7)), phase = rand(0, TAU), ga = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < count; i++) {
+    const y = 1 - (i + .5) / count * 2, r = Math.sqrt(1 - y * y), a = phase + i * ga, s = v * rand(.94, 1.02);
+    const dx = Math.cos(a) * r + rand(-.05, .05), dy = y + rand(-.05, .05), dz = Math.sin(a) * r + rand(-.05, .05);
+    spawn(p.x, p.y, p.z, dx * s, dy * s, dz * s, life * rand(.82, 1.08), size * rand(.8, 1.2), c1, c2, k, grav, flag, tl);
+  }
+}
+function peony(p, silent, scale = 1) {
+  const [a, b] = pick(PAIRS), D = p.length(), R = D * rand(.25, .29) * scale;
+  burstCommon(p, R, a, silent, scale);
+  shellStars(p, 230 * scale, R, 2, 2.15, D * .0115, a, b, 9.8, F.LATE, 0);
+  shellStars(p, 80 * scale, R * .45, 2.3, 1.5, D * .009, b, C.white, 9.8, F.LATE, 0);
+}
+function chrysanthemum(p, silent, scale = 1) {
+  const [a, b] = pick(PAIRS), D = p.length(), R = D * rand(.28, .32) * scale;
+  burstCommon(p, R, a, silent, 1.2 * scale);
+  shellStars(p, 210 * scale, R, 1.9, 2.5, D * .0115, C.white, a, 9.8, F.TRAIL | F.LATE, .5);
+  shellStars(p, 45, R * .3, 2.2, 1.3, D * .01, b, b, 6, F.TWINKLE | F.LATE, 0);
+}
+function goldenRain(p, silent) {
+  const D = p.length(), R = D * rand(.24, .27);
+  const delay = burstCommon(p, R, C.gold, silent, .85);
+  shellStars(p, 175, R, 1.45, 4.3, D * .0095, C.gold, C.charcoal, 9.8, F.TRAIL | F.LATE, 1.15);
+  if (!silent) sfx.sizzle(3.6, panFor(p), delay + .2);
+}
+function crackling(p, silent) {
+  const D = p.length(), R = D * rand(.22, .26);
+  const delay = burstCommon(p, R, C.silver, silent, .75);
+  shellStars(p, 110, R, 2, 1.25, D * .009, C.gold, C.silver, 9.8, F.CRACKLE | F.LATE, 0);
+  if (!silent) sfx.crackle(90, panFor(p), delay + 1, 1.05);
+}
+// Golden willow: the stars keep their trails as they sag down for several seconds, like wet branches.
+function willow(p, silent, scale = 1) {
+  const D = p.length(), R = D * rand(.26, .3) * scale;
+  const delay = burstCommon(p, R, C.gold, silent, 1.15 * scale);
+  shellStars(p, 200 * scale, R, 1.4, rand(4.6, 5.8), D * .009, C.gold, C.charcoal, 5.5, F.TRAIL | F.LATE, 1.8);
+  shellStars(p, 80 * scale, R * .55, 1.6, 3.2, D * .0085, C.silver, C.gold, 5.5, F.TRAIL | F.LATE, 1.3);
+  if (!silent) sfx.sizzle(4.8, panFor(p), delay + .15);
+}
+// Crossettes: clean white stars that split, one by one, into small red clusters.
+function crossette(p, silent, scale = 1) {
+  const D = p.length(), R = D * rand(.22, .26) * scale;
+  burstCommon(p, R, C.white, silent, .9 * scale);
+  shellStars(p, 140 * scale, R, 2, 1.4, D * .01, C.white, C.gold, 8, F.SPLIT | F.LATE, 0);
+  shellStars(p, 55 * scale, R * .8, 1.8, 1.8, D * .009, C.red, C.gold, 9.8, F.LATE, 0);
+}
+// Palm: fronds fan out sideways in the green, gold-tipped, the way the real thing does.
+function palm(p, silent, scale = 1) {
+  const D = p.length(), R = D * rand(.24, .28) * scale;
+  burstCommon(p, R, C.green, silent, scale);
+  const n = Math.floor(130 * scale * (quality > .8 ? 1 : .7));
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), vy = rand(-.35, .4), v = R * 2 * rand(.8, 1.1);
+    spawn(p.x, p.y, p.z, Math.cos(a) * v, vy * v * .5, Math.sin(a) * v, rand(1.8, 2.6), D * .01, C.green, C.gold, 1.6, 9.8, F.TRAIL | F.LATE, .45);
+  }
+}
+// Peacock: a teal shell with a green centre and blue twinkles.
+function peacock(p, silent, scale = 1) {
+  const D = p.length(), R = D * rand(.26, .3) * scale;
+  burstCommon(p, R, C.teal, silent, 1.05 * scale);
+  shellStars(p, 170 * scale, R, 1.9, 2.3, D * .01, C.teal, C.green, 9.8, F.LATE, 0);
+  shellStars(p, 65 * scale, R * .5, 2.2, 1.5, D * .009, C.blue, C.white, 9.8, F.TWINKLE | F.LATE, 0);
+}
+// Colour bomb: one white flash, then a handful of little coloured bursts rippling around it.
+function colorBomb(p, silent, scale = 1) {
+  const D = p.length(), R = D * rand(.22, .26) * scale;
+  burstCommon(p, R, C.white, silent, .85 * scale);
+  const cols = [C.teal, C.magenta, C.green, C.orange, C.blue, C.pink];
+  const q = p.clone(), total = Math.floor((quality > .8 ? 8 : 5) * scale), t0 = performance.now();
+  let n = 0;
+  emitters.push({ update() {
+    const t = (performance.now() - t0) / 1000;
+    while (n < total && t >= .3 + n * .28) {
+      const c = cols[n % cols.length];
+      const cp = new THREE.Vector3(q.x + rand(-.2, .2) * D, q.y + rand(-.15, .15) * D, q.z + rand(-.2, .2) * D);
+      const cr = R * rand(.32, .5);
+      burstCommon(cp, cr, c, silent, .5);
+      shellStars(cp, 65, cr, 2, 1.6, D * .008, c, C.white, 9.8, F.LATE, 0);
+      if (!silent) sfx.pop(panFor(cp), 0, .5);
+      n++;
+    }
+    return n < total;
+  } });
+}
+// Every shell climbs to where you tapped before it breaks, so you see the tail and hear the tube first.
+function launch(target, burst, T = rand(.6, .78), silent = false) {
+  const start = new THREE.Vector3(target.x * .32, floorY, target.z * .32), pos = new THREE.Vector3(), last = start.clone();
+  if (!silent) sfx.lift(panFor(target));
+  let t = 0;
+  emitters.push({ update(dt) {
+    t += dt;
+    const k = Math.min(1, t / T), e = 1 - (1 - k) * (1 - k);
+    pos.lerpVectors(start, target, e);
+    const size = target.length() * .004;
+    for (let i = 0; i < 4; i++) {
+      const f = i / 4;
+      spawn(last.x + (pos.x - last.x) * f, last.y + (pos.y - last.y) * f, last.z + (pos.z - last.z) * f, rand(-1, 1), rand(-4, -1), rand(-1, 1), rand(.2, .45), size * rand(.6, 1.1), C.gold, C.charcoal, 1.5, 3, 0, 0, .06);
+    }
+    last.copy(pos);
+    if (k >= 1) { burst(target.clone(), silent); return false; }
+    return true;
+  } });
+}
+// A rocket is a small motor with a small payload: it burns out, coasts for a beat in the dark, then cracks open into a few heavy comets.
+function rocketBreak(p) {
+  const D = p.length(), R = D * rand(.17, .2), c = pick([C.gold, C.gold, C.red, C.green, C.silver]);
+  glowAt(p, R * 1.1, C.white, .09);
+  lightScene(c, .08);
+  shellSmoke(p, R, c, 8);
+  sfx.crack(p);
+  for (let i = 0; i < 34; i++) {
+    const d = randDir(), v = R * 2.1 * rand(.65, 1.1);
+    spawn(p.x, p.y, p.z, d[0] * v, (d[1] + .25) * v, d[2] * v, rand(1.7, 2.4), D * .0125, c, C.amber, 2.1, 17, F.TRAIL | F.LATE, rand(.8, 1.15));
+  }
+  for (let i = 0; i < 50; i++) {
+    const d = randDir(), v = R * rand(1, 4);
+    spawn(p.x, p.y, p.z, d[0] * v, d[1] * v, d[2] * v, rand(.25, .55), D * .0045, C.white, C.gold, 3.4, 9.8, F.TWINKLE);
+  }
+}
+function rocket(target) {
+  const start = new THREE.Vector3(target.x * .2, floorY, target.z * .2), pos = new THREE.Vector3(), last = start.clone();
+  const { r } = VIEW(), bow = target.length() * rand(.02, .045) * (Math.random() < .5 ? -1 : 1), wob = rand(0, TAU);
+  const burn = rand(.95, 1.15), T = burn + rand(.32, .46), ember = [.8, .3, .06];
+  sfx.fizz(burn + .2, panFor(target));
+  let t = 0;
+  emitters.push({ update(dt) {
+    t += dt;
+    const e = t < burn ? .8 * Math.pow(t / burn, 1.7) : .8 + .2 * (1 - Math.pow(1 - Math.min(1, (t - burn) / (T - burn)), 2));
+    pos.lerpVectors(start, target, e).addScaledVector(r, Math.sin(Math.PI * e) * bow + Math.sin(t * 30 + wob) * .14 * (1 - e));
+    const D = pos.length();
+    if (t < burn) {
+      spawn(pos.x, pos.y, pos.z, pos.x - last.x, pos.y - last.y, pos.z - last.z, rand(.16, .26), D * .0024, C.white, C.charcoal, 0, 0, F.SEG, 0, 1, -1);
+      for (let i = 0; i < 3; i++) {
+        const f = Math.random();
+        spawn(last.x + (pos.x - last.x) * f, last.y + (pos.y - last.y) * f, last.z + (pos.z - last.z) * f, rand(-2, 2), rand(-7, -1.5), rand(-2, 2), rand(.25, .6), D * rand(.0018, .0034), C.gold, C.charcoal, 1.2, 6, Math.random() < .3 ? F.TWINKLE : 0, 0, .05);
+      }
+      glowAt(pos, D * .012, C.gold, .05);
+    } else spawn(pos.x, pos.y, pos.z, 0, 0, 0, .05, D * .0028, ember, ember, 0, 0);
+    last.copy(pos);
+    if (t >= T) { rocketBreak(target.clone()); return false; }
+    return true;
+  } });
+}
+const VIEW = () => {
+  const f = camera.getWorldDirection(new THREE.Vector3()).clone();
+  return { f, r: new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion), u: new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion) };
+};
+function twelveShot(target) {
+  const dist = target.length(), { r } = VIEW();
+  const dir = target.clone().normalize();
+  let t = 0, n = 0;
+  emitters.push({ update(dt) {
+    t += dt;
+    while (n < 12 && n * .24 <= t) {
+      const off = ((n % 2 ? 1 : -1) * (6 - Math.abs(n - 6))) * .05 + rand(-.015, .015);
+      const d = dir.clone().addScaledVector(r, off).normalize().multiplyScalar(dist * rand(.88, 1.08));
+      launch(d, (q, s) => peony(q, s, .55), rand(.42, .56));
+      n++;
+    }
+    return n < 12;
+  } });
+}
+function finale() {
+  const { f, r, u } = VIEW();
+  const plan = [];
+  for (let i = 0; i < 26; i++) plan.push({ at: i * .26 + rand(0, .16), fn: pick([peony, chrysanthemum, goldenRain, crackling]) });
+  for (let i = 0; i < 7; i++) plan.push({ at: 7.1 + rand(0, .4), fn: chrysanthemum });
+  plan.sort((a, b) => a.at - b.at);
+  let t = 0, n = 0;
+  emitters.push({ finale: true, update(dt) {
+    t += dt;
+    while (n < plan.length && plan[n].at <= t) {
+      const d = f.clone().addScaledVector(r, rand(-.34, .34)).addScaledVector(u, rand(-.28, .5)).normalize().multiplyScalar(rand(100, 140));
+      launch(d, plan[n++].fn, rand(.45, .7));
+    }
+    return n < plan.length;
+  } });
+}
+
+/* ---------- Ground crackers, as objects ---------- */
+function paperTex(draw) {
+  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+  draw(c.getContext('2d'));
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.NoColorSpace; t.anisotropy = 4;
+  return t;
+}
+const TEX = {
+  atom: paperTex((x) => {
+    x.fillStyle = '#2c6a41'; x.fillRect(0, 0, 128, 128);
+    x.fillStyle = '#e9c23a'; x.fillRect(0, 50, 128, 28);
+    x.fillStyle = '#b3241c'; for (let i = 0; i < 4; i++) { x.beginPath(); x.arc(16 + i * 32, 64, 8, 0, TAU); x.fill(); }
+    x.strokeStyle = '#d9c9a0'; x.lineWidth = 3;
+    for (let y = 12; y < 128; y += 34) { x.beginPath(); x.moveTo(0, y); x.lineTo(128, y + 6); x.stroke(); }
+  }),
+  lakshmi: paperTex((x) => {
+    x.fillStyle = '#c0281f'; x.fillRect(0, 0, 128, 128);
+    x.fillStyle = '#f0d27a'; x.fillRect(0, 44, 128, 40);
+    x.fillStyle = '#c0281f'; x.beginPath(); x.arc(64, 64, 13, 0, TAU); x.fill();
+  }),
+  sutli: paperTex((x) => {
+    x.fillStyle = '#6d5332'; x.fillRect(0, 0, 128, 128);
+    x.strokeStyle = '#99794b'; x.lineWidth = 2;
+    for (let i = -128; i < 128; i += 6) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + 128, 128); x.stroke(); }
+    x.strokeStyle = '#4a3820'; x.lineWidth = 1;
+    for (let i = 0; i < 256; i += 9) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i - 128, 128); x.stroke(); }
+  }),
+  wala: paperTex((x) => {
+    x.fillStyle = '#b81f1c'; x.fillRect(0, 0, 128, 128);
+    x.fillStyle = '#f0d27a'; x.fillRect(0, 54, 128, 18);
+  }),
+  shadow: paperTex((x) => {
+    const g = x.createRadialGradient(64, 64, 4, 64, 64, 62);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(.55, 'rgba(0,0,0,.65)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    x.clearRect(0, 0, 128, 128); x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+  }),
+};
+const G = {
+  atom: new THREE.CylinderGeometry(.032, .032, .06, 20),
+  sutli: new THREE.SphereGeometry(.045, 22, 16),
+  lakshmi: new THREE.CylinderGeometry(.012, .012, .07, 12),
+  wala: new THREE.CylinderGeometry(.007, .007, .04, 8),
+  plane: new THREE.PlaneGeometry(2, 2).rotateX(-Math.PI / 2),
+};
+let ambLum = .4;
+const propLevel = (flame) => clamp(ambLum * 2.4 + flame, .2, 1.25);
+function contactShadow(x, z, radius, opacity) {
+  const mat = new THREE.MeshBasicMaterial({ map: TEX.shadow, transparent: true, opacity, depthWrite: false, depthTest: false, toneMapped: false });
+  const m = new THREE.Mesh(G.plane, mat);
+  m.position.set(x, floorY + .003, z);
+  m.scale.setScalar(radius);
+  m.frustumCulled = false; m.renderOrder = 1;
+  scene.add(m);
+  return m;
+}
+function makeProp(geom, tex, x, y, z, shadowR) {
+  const mat = new THREE.MeshBasicMaterial({ map: tex, toneMapped: false });
+  const m = new THREE.Mesh(geom, mat);
+  m.position.set(x, floorY + y, z);
+  scene.add(m);
+  return { m, mat, shadow: contactShadow(x, z, shadowR, .55), lit(flame) { mat.color.setScalar(propLevel(flame)); } };
+}
+const dropProp = (p) => { p.mat.dispose(); p.m.removeFromParent(); p.shadow.material.dispose(); p.shadow.removeFromParent(); };
+function groundSmoke(x, y, z, c, n, size, rise) {
+  for (let i = 0; i < n; i++) puff(x + rand(-.03, .03), y, z + rand(-.03, .03), rand(-.1, .1), rise * rand(.6, 1.2), rand(-.1, .1), rand(1.4, 2.8), size * rand(.7, 1.2), size * .55, c, [.22, .21, .2], rand(.09, .17), .6, -.05, .08);
+}
+
+const PAPER = [.72, .08, .07], PAPER2 = [.85, .62, .28];
+function scatterPaper(x, y, z, n, speed, life) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), v = rand(.15, .6) * speed, c = Math.random() < .86 ? PAPER : PAPER2;
+    puff(x, y, z, Math.cos(a) * v, rand(.6, 1.2) * speed, Math.sin(a) * v, life * rand(.75, 1.1), rand(.005, .01), 0, c, c, 1, 2.6, 4.6, .05, 1);
+  }
+}
+// One routine, scaled by how much powder is packed inside.
+const BOMBS = {
+  atom: { geo: G.atom, tex: TEX.atom, h: .06, shadow: .08, fuse: 1.7, power: 1 },
+  sutli: { geo: G.sutli, tex: TEX.sutli, h: .09, shadow: .08, fuse: 1.2, power: .7 },
+  lakshmi: { geo: G.lakshmi, tex: TEX.lakshmi, h: .07, shadow: .04, fuse: .9, power: .32 },
+};
+function bomb(p, b) {
+  const { power, fuse, h } = b, prop = makeProp(b.geo, b.tex, p.x, h / 2, p.z, b.shadow), pan = panFor(p), R = .35 + .65 * power;
+  sfx.fuse(fuse, pan);
+  let t = 0;
+  emitters.push({ ground: true, update(dt) {
+    t += dt;
+    prop.lit(.05 + Math.random() * .08);
+    if (t < fuse) {
+      for (let k = 0; k < 5; k++) spawn(p.x, floorY + h + .012, p.z, rand(-1, 1), rand(.5, 2), rand(-1, 1), rand(.08, .24), .008, C.white, C.amber, 1.5, 4, F.TWINKLE, 0, .03);
+      floorGlow(p.x, p.z, [1, .55, .2], .12 + Math.random() * .1, .4);
+      return true;
+    }
+    dropProp(prop);
+    const c = { x: p.x, y: floorY + .18, z: p.z };
+    glowAt(c, 3.2 * R, C.white, .12);
+    glowAt(c, 2 * R, C.amber, .4);
+    floorPulse(p.x, p.z, [1, .85, .6], 3.4 * power, 6 * R, 3.2);
+    lightScene([1, .88, .68], power);
+    if (power > .5) shake = (reduceMotion ? .2 : 1) * power;
+    sfx.bomb(pan, power);
+    vibrate(power > .5 ? [90, 30, 140] : 40);
+    for (let k = 0; k < 340 * power; k++) { const d = randDir(), v = rand(3, 13) * R; spawn(c.x, c.y, c.z, d[0] * v, Math.abs(d[1]) * v, d[2] * v, rand(.3, .9), rand(.012, .022), C.gold, C.red, 1.8, 9.8, F.BOUNCE, 0, .03); }
+    if (power > .5) for (let k = 0; k < 120; k++) { const a = (k / 120) * TAU, v = 13 * R; spawn(c.x, floorY + .05, c.z, Math.cos(a) * v, 0, Math.sin(a) * v, .32, .03, C.white, C.amber, 4.4, 0, 0, 0, .02); }
+    for (let k = 0; k < 42 * power; k++) { const a = rand(0, TAU), v = rand(.3, 1.9) * R; puff(c.x + Math.cos(a) * .1, c.y, c.z + Math.sin(a) * .1, Math.cos(a) * v, rand(.3, 1.8), Math.sin(a) * v, rand(2.4, 5), rand(.25, .55) * R, .5 * R, [.9, .6, .3], [.24, .23, .22], rand(.16, .3), 1.2, -.08, .1); }
+    for (let k = 0; k < 20 * power; k++) puff(c.x + rand(-.12, .12), c.y, c.z + rand(-.12, .12), rand(-.25, .25), rand(1.2, 3.4), rand(-.25, .25), rand(2.2, 4.2), rand(.2, .42), .4, [1, .7, .4], [.26, .25, .24], rand(.18, .3), 1, -.12, .08);
+    scatterPaper(c.x, c.y, c.z, Math.ceil(46 * power), 2.6, 13);
+    const scorch = contactShadow(p.x, p.z, .7 * R, .75);
+    let st = 0;
+    emitters.push({ update(d) { st += d; if (st > 9) { scorch.material.opacity = .75 * (1 - (st - 9) / 3); if (st > 12) { scorch.material.dispose(); scorch.removeFromParent(); return false; } } return true; } });
+    return false;
+  } });
+}
+// A kumatali: a bigger bomb with a long walking fuse.
+BOMBS.kumatali = { geo: G.lakshmi, tex: TEX.sutli, h: .07, shadow: .05, fuse: 3.4, power: 1.35 };
+
+/* ---------- Chakras: fire wheels that spin on the ground ----------
+   Each ring is a circle of short-lived, trailing sparks carried around a centre,
+   so the wheel reads as a thin, bright ring turning on the floor. Each axis pair
+   below defines one ring orientation in space. */
+const CHAKRA_AXES = [
+  [[1, 0, 0], [0, 1, 0]], // vertical, in the X plane
+  [[1, 0, 0], [0, 0, 1]], // flat, lying on the floor
+  [[0, 1, 0], [0, 0, 1]], // vertical, in the Z plane
+];
+const CHAKRAS = {
+  chakra: { rings: 1, dur: 4.5, size: .5 },
+  chakratrice: { rings: 3, dur: 6, size: .42 },
+};
+function chakra(p, spec) {
+  const { rings, dur, size } = spec, pan = panFor(p);
+  const off = rings === 1 ? [[0, 0]] : [[-.16, 0], [.13, .1], [.08, -.14]];
+  const spin = [];
+  for (let q = 0; q < rings; q++) spin.push(rand(1.6, 2.4) * (q % 2 ? -1 : 1));
+  const K = quality > .8 ? 26 : 14;
+  const em = { ground: true, t: -1.2, update(dt) {
+    let live = false;
+    for (let q = 0; q < rings; q++) {
+      const t = em.t + q * .35;
+      if (t >= dur) continue;
+      live = true;
+      const r = Math.min(1, t / .3) * Math.max(0, 1 - (t - (dur - 1.2)) / 1.2);
+      if (r < .05) continue;
+      const ax = CHAKRA_AXES[(q + rings) % 3], c = off[q], R = r * size * (q ? .72 : 1);
+      const a = t * spin[q], co = Math.cos(a), si = Math.sin(a);
+      // K points spread around the ring this frame; each is a short trail, so together they read as a continuous wheel of fire.
+      for (let i = 0; i < K; i++) {
+        const u = a + (i / K) * TAU + rand(-.06, .06), uc = Math.cos(u), us = Math.sin(u);
+        const px = p.x + (ax[0][0] * uc + ax[1][0] * us) * R + c[0];
+        const py = p.y + (ax[0][1] * uc + ax[1][1] * us) * R + .015;
+        const pz = p.z + (ax[0][2] * uc + ax[1][2] * us) * R + c[1];
+        const vx = (-ax[0][0] * us + ax[1][0] * uc) * R * spin[q] + rand(-.1, .1);
+        const vy = (-ax[0][1] * us + ax[1][1] * uc) * R * spin[q] + rand(0, .25);
+        spawn(px, py, pz, vx, vy, rand(-.1, .1) * .5, rand(.1, .22), .013 * r + .004, C.gold, C.amber, 0, 0, 0, 0, .16, 1);
+      }
+      if (Math.random() < .35) floorPulse(p.x + c[0], p.z + c[1], [1, .6, .25], .08 * r, 1.1 * size, 8);
+    }
+    em.t += dt;
+    if (!live || em.t >= dur) return false;
+    if (Math.random() < .08) sfx.pop(pan + rand(-.2, .2), rand(0, .02), .35);
+    return true;
+  } };
+  emitters.push(em);
+  sfx.fuse(dur, pan); // the continuous crackle a real chakra gives off
+}
+// A wala is laid straight out ahead of you, so it runs up the screen, and burns from the far end back towards you.
+const WALAS = {
+  wala100: { n: 64, length: 1.1, waves: 2, amp: .04, gap: [.022, .062], paper: 2 },
+  wala1000: { n: 260, length: 2, waves: 4, amp: .09, gap: [.012, .036], paper: 1 },
+};
+function wala(p, w) {
+  const r = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion); r.y = 0; r.normalize();
+  const f = new THREE.Vector3(-r.z, 0, r.x), n = w.n, pts = [], mat = new THREE.MeshBasicMaterial({ map: TEX.wala, toneMapped: false });
+  const inst = new THREE.InstancedMesh(G.wala, mat, n), dummy = new THREE.Object3D(), pan = panFor(p);
+  const ahead = -(p.x * f.x + p.z * f.z), shift = Math.max(0, .6 + w.length / 2 - ahead); // keep the near end in front of the phone
+  for (let i = 0; i < n; i++) {
+    const u = i / (n - 1), s = (u - .5) * w.length - shift, o = Math.sin(u * TAU * w.waves) * w.amp;
+    pts.push(new THREE.Vector3(p.x + f.x * s + r.x * o, floorY, p.z + f.z * s + r.z * o));
+  }
+  for (let i = 0; i < n; i++) {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    dummy.position.set(pts[i].x, floorY + .009, pts[i].z);
+    dummy.rotation.set(Math.PI / 2, 0, Math.atan2(a.x - b.x, b.z - a.z) + (i % 2 ? .95 : -.95));
+    dummy.scale.setScalar(1);
+    dummy.updateMatrix();
+    inst.setMatrixAt(i, dummy.matrix);
+  }
+  inst.frustumCulled = false;
+  scene.add(inst);
+  mat.color.setScalar(propLevel(0));
+  let t = 0, i = 0, cursor = .35;
+  const times = pts.map(() => { const at = cursor; cursor += Math.random() < .08 ? rand(.1, .22) : rand(w.gap[0], w.gap[1]); return at; });
+  emitters.push({ ground: true, update(dt) {
+    t += dt;
+    while (i < n && times[i] <= t) {
+      const q = pts[i], big = i % 24 === 23; // every so often one packed heavier than the rest
+      dummy.scale.setScalar(.0001);
+      dummy.position.set(q.x, floorY, q.z);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+      inst.instanceMatrix.needsUpdate = true;
+      sfx.pop(pan + rand(-.1, .1), rand(0, .012), big ? 1.5 : rand(.65, 1));
+      glowAt({ x: q.x, y: floorY + .04, z: q.z }, big ? .6 : .34, C.white, .06);
+      floorPulse(q.x, q.z, [1, .72, .4], big ? 1.3 : .7, 1.1, 12);
+      lightScene([1, .75, .45], big ? .16 : .07);
+      for (let k = 0; k < 14; k++) { const d = randDir(), v = rand(1.5, 4.6); spawn(q.x, floorY + .04, q.z, d[0] * v, Math.abs(d[1]) * v, d[2] * v, rand(.1, .3), .012, C.white, C.amber, 2.2, 7, F.BOUNCE, 0, .03); }
+      scatterPaper(q.x, floorY + .03, q.z, w.paper, 1.4, 11);
+      if (i % 3 === 0) groundSmoke(q.x, floorY + .06, q.z, [.5, .38, .24], 1, .1, .5);
+      if (i % 6 === 0) vibrate(7);
+      i++;
+    }
+    if (i >= n) { inst.removeFromParent(); inst.dispose(); mat.dispose(); return false; }
+    return true;
+  } });
+}
+
+/* ---------- The tray ---------- */
+const ICONS = {
+  rocket: '<path d="M12 3c3 2 4 5 4 8l-1.5 5h-5L8 11c0-3 1-6 4-8z"/><path d="M12 16v5M9.5 19l-1 2M14.5 19l1 2"/>',
+  shot: '<path d="M12 2v5M12 17v5M2 12h5M17 12h5M5 5l3.5 3.5M15.5 15.5L19 19M19 5l-3.5 3.5M8.5 15.5L5 19"/>',
+  twelve: '<rect x="4" y="13" width="16" height="8" rx="1"/><path d="M8 13v8M12 13v8M16 13v8M8 10V7M12 9V3M16 10V7"/>',
+  rain: '<path d="M4 6c2-3 14-3 16 0"/><path d="M5 9v5M9 8v9M12 8v12M15 8v9M19 9v5"/>',
+  crackle: '<circle cx="6" cy="7" r="1"/><circle cx="16" cy="5" r="1"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="13" r="1"/><circle cx="6" cy="17" r="1"/><circle cx="15" cy="19" r="1"/>',
+  willow: '<path d="M4 5c2 4 4 10 4 14M12 5v14M20 5c-2 4-4 10-4 14"/><path d="M8 12c0 3 1.5 6 4 6s4-3 4-6"/>',
+  crossette: '<path d="M12 4v4M12 16v4M4 12h4M16 12h4"/><path d="M12 8l1.5 2.5L12 13l-1.5-2.5zM12 11l2 1.5L12 14.5l-2-2z"/>',
+  palm: '<path d="M6 20c0-7 3-12 9-15"/><path d="M6 13c3-1 6-1 9 1M6 9c2.5-.5 5-.3 7 .8M6 17c3 .5 5.5 0 8-2"/>',
+  peacock: '<circle cx="12" cy="9" r="3.5"/><path d="M12 12.5V19M8 13.5l-2 5M16 13.5l2 5M12 16l0 3"/>',
+  colorbomb: '<circle cx="12" cy="12" r="2"/><circle cx="5.5" cy="7" r="1.2"/><circle cx="18.5" cy="7" r="1.2"/><circle cx="5.5" cy="17" r="1.2"/><circle cx="18.5" cy="17" r="1.2"/><circle cx="12" cy="4" r="1.2"/><circle cx="12" cy="20" r="1.2"/>',
+  finale: '<path d="M7 3v4M7 11v4M3 9h4M9 9h4M17 8v3M17 14v3M13.5 12.5h3M18 12.5h3M10 18v3M8.5 19.5h3"/>',
+  atom: '<circle cx="12" cy="12" r="1.6"/><ellipse cx="12" cy="12" rx="10" ry="4"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(120 12 12)"/>',
+  sutli: '<circle cx="11" cy="15" r="6.5"/><path d="M15.5 10.5L18 8c1-1 2.5-.5 3 1"/>',
+  lakshmi: '<rect x="8" y="9" width="8" height="12" rx="1"/><path d="M12 9V5c0-1.5 2-2 3-1"/>',
+  kumatali: '<rect x="9" y="4" width="6" height="14" rx="2"/><path d="M12 4V2M7 8l-2-1M17 8l2-1M7 12l-2 .5M17 12l2 .5"/>',
+  chakra: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M12 4v5M12 15v5M4 12h5M15 12h5"/>',
+  chakratrice: '<circle cx="9" cy="10" r="5"/><circle cx="15" cy="14" r="4"/><circle cx="12" cy="12" r="1.2"/>',
+  wala100: '<path d="M2 14c3-5 5 3 8-1s5 3 8-1 3-1 4 0"/><path d="M5 9l1 3M10 9l.5 3M15 8l.5 3M20 8l-.5 3"/>',
+  wala1000: '<path d="M2 7c3-4 5 2 8-1s5 2 8-1 3-1 4 0"/><path d="M2 13c3-4 5 2 8-1s5 2 8-1 3-1 4 0"/><path d="M2 19c3-4 5 2 8-1s5 2 8-1 3-1 4 0"/>',
+};
+const KINDS = {
+  sky: [['rocket', 'Rocket'], ['shot', 'Sky shot'], ['rain', 'Golden rain'], ['crackle', 'Crackling'], ['willow', 'Golden willow'], ['crossette', 'Crossette'], ['palm', 'Palm'], ['peacock', 'Peacock'], ['colorbomb', 'Colour bomb'], ['twelve', '12 shot'], ['finale', 'Finale']],
+  ground: [['atom', 'Atom bomb'], ['sutli', 'Sutli bomb'], ['lakshmi', 'Lakshmi'], ['kumatali', 'Kumatali'], ['chakra', 'Chakra'], ['chakratrice', 'Chakra trice'], ['wala100', '100 wala'], ['wala1000', '1000 wala']],
+};
+const selected = { sky: 'rocket', ground: 'atom' };
+const pickerEl = $('picker'), hintEl = $('hint'), modeEl = $('mode'), surfaceBtn = $('surfaceBtn'), catBtn = $('catBtn');
+let mode = 'sky';
+function renderPicker() {
+  pickerEl.textContent = '';
+  for (const [id, name] of KINDS[mode]) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'pick';
+    b.setAttribute('aria-pressed', String(selected[mode] === id));
+    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[id]}</svg><span>${name}</span>`;
+    b.addEventListener('click', () => {
+      const keep = pickerEl.scrollLeft;
+      selected[mode] = id;
+      renderPicker();
+      pickerEl.scrollLeft = keep;
+      ensureAudio();
+      if (id === 'finale') hint('Tap the sky to set off the finale.', 3000);
+    });
+    pickerEl.appendChild(b);
+  }
+}
+let hintTimer = 0;
+function hint(text, ms) {
+  hintEl.textContent = text;
+  hintEl.classList.add('show');
+  clearTimeout(hintTimer);
+  hintTimer = setTimeout(() => hintEl.classList.remove('show'), ms);
+}
+const toldMode = {};
+function setMode(m) {
+  if (m === mode) return;
+  mode = m;
+  modeEl.textContent = m === 'sky' ? 'Sky' : 'Surface found';
+  catBtn.textContent = m === 'sky' ? 'Floor' : 'Sky';
+  catBtn.setAttribute('aria-pressed', String(m === 'ground'));
+  surfaceBtn.hidden = m !== 'ground';
+  renderPicker();
+  pickerEl.scrollLeft = 0;
+  vibrate(10);
+  if (playing && !uiHidden && !toldMode[m]) { toldMode[m] = true; hint(m === 'sky' ? 'Tap anywhere to burst it there.' : 'Surface found. Tap it to light a cracker.', 3600); }
+}
+// Manual override: choose the category without tilting. On a gyro phone the floor
+// auto-switch is held off briefly, so an explicit choice is not instantly reversed.
+let groundGrace = 0;
+catBtn.addEventListener('click', () => {
+  const to = mode === 'sky' ? 'ground' : 'sky';
+  if (to === 'ground') {
+    groundGrace = performance.now() + 4000;
+    if (!gyro) look.pitch = -.6; // no motion sensors: point the view at the floor so it sticks
+  } else if (!gyro) {
+    look.pitch = .12; // back to the sky
+  }
+  setMode(to);
+});
+surfaceBtn.addEventListener('click', () => {
+  floorY = floorY === -FLOOR_H ? -TABLE_H : -FLOOR_H;
+  surfaceBtn.textContent = floorY === -FLOOR_H ? 'On the floor' : 'On a table';
+});
+
+function fireAt(cx, cy) {
+  const ray = rayAt(cx, cy), id = selected[mode];
+  if (mode === 'sky') {
+    const p = ray.clone().multiplyScalar(rand(100, 135));
+    if (id === 'rocket') rocket(p);
+    else if (id === 'shot') launch(p, Math.random() < .5 ? peony : chrysanthemum);
+    else if (id === 'twelve') twelveShot(p);
+    else if (id === 'rain') launch(p, goldenRain);
+    else if (id === 'crackle') launch(p, crackling);
+    else if (id === 'willow') launch(p, willow);
+    else if (id === 'crossette') launch(p, crossette);
+    else if (id === 'palm') launch(p, palm);
+    else if (id === 'peacock') launch(p, peacock);
+    else if (id === 'colorbomb') launch(p, colorBomb);
+    else if (id === 'finale' && !emitters.some((e) => e.finale)) finale();
+    used[id] = (used[id] || 0) + 1;
+    return;
+  }
+  if (emitters.filter((e) => e.ground).length >= 7) return;
+  const spot = floorPoint(ray);
+  used[id] = (used[id] || 0) + 1;
+  if (CHAKRAS[id]) chakra(spot, CHAKRAS[id]);
+  else if (BOMBS[id]) bomb(spot, BOMBS[id]);
+  else wala(spot, WALAS[id]);
+}
+
+/* ---------- Motion and look ---------- */
+const orient = { a: 0, b: 0, g: 0, ok: false };
+addEventListener('deviceorientation', (e) => {
+  if (e.alpha == null || e.beta == null || e.gamma == null) return;
+  orient.a = e.alpha; orient.b = e.beta; orient.g = e.gamma; orient.ok = true;
+}, true);
+const scrAngle = () => (screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : window.orientation || 0);
+const zee = new THREE.Vector3(0, 0, 1), eul = new THREE.Euler(), q0 = new THREE.Quaternion(), qBack = new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2);
+const qT = new THREE.Quaternion(), qC = new THREE.Quaternion(), lookE = new THREE.Euler(0, 0, 0, 'YXZ');
+const look = { yaw: 0, pitch: .12 };
+let gyro = false, primed = false;
+function updateCamera(dt) {
+  if (playing && gyro && orient.ok) {
+    eul.set(orient.b * DEG, orient.a * DEG, -orient.g * DEG, 'YXZ');
+    qT.setFromEuler(eul).multiply(qBack).multiply(q0.setFromAxisAngle(zee, -scrAngle() * DEG));
+    if (!primed) { qC.copy(qT); primed = true; } else qC.slerp(qT, 1 - Math.exp(-dt * 26));
+  } else {
+    look.pitch = clamp(look.pitch, -1.25, 1.35);
+    qC.setFromEuler(lookE.set(look.pitch, look.yaw, 0));
+  }
+  camera.quaternion.copy(qC);
+  camera.updateMatrixWorld();
+  camera.getWorldDirection(fwd);
+  const pitch = Math.asin(clamp(fwd.y, -1, 1));
+  const tiltFree = performance.now() > groundGrace;
+  if (tiltFree && mode === 'sky' && pitch < -.33) setMode('ground');
+  else if (tiltFree && mode === 'ground' && pitch > -.18) setMode('sky');
+}
+
+/* ---------- Camera feed and layout ---------- */
+let camOn = false;
+const LONG_FOV = 67;
+function updateFov() {
+  const aspect = W / H;
+  let v;
+  if (camOn && video.videoWidth) {
+    const vw = video.videoWidth, vh = video.videoHeight, s = Math.max(W / vw, H / vh);
+    const f = (Math.max(vw, vh) / 2) / Math.tan((LONG_FOV / 2) * DEG);
+    v = 2 * Math.atan((H / 2) / (f * s));
+    shared.uCov.value.set(W / (vw * s), H / (vh * s));
+  } else v = clamp(2 * Math.atan(Math.tan(36 * DEG) / Math.min(aspect, 1)), 50 * DEG, 78 * DEG);
+  camera.fov = v / DEG; camera.aspect = aspect; camera.updateProjectionMatrix();
+  sparkMat.uniforms.uScale.value = (H * dpr / 2) / Math.tan(v / 2);
+  sparkMat.uniforms.uMin.value = 1.1 * dpr;
+}
+function resize() {
+  W = stage.clientWidth || innerWidth; H = stage.clientHeight || innerHeight;
+  dpr = Math.min(devicePixelRatio || 1, quality > .8 ? 2 : 1.35);
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(W, H, false);
+  shared.uRes.value.set(W * dpr, H * dpr);
+  updateFov();
+}
+addEventListener('resize', resize);
+addEventListener('orientationchange', () => setTimeout(resize, 250));
+video.addEventListener('loadedmetadata', updateFov);
+video.addEventListener('resize', updateFov);
+
+async function startCamera() {
+  if (!window.isSecureContext || !navigator.mediaDevices) throw new Error('blocked');
+  await attachFeed(await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }));
+}
+async function attachFeed(stream) {
+  video.srcObject = stream;
+  try { await video.play(); } catch (e) { /* inline muted video normally plays */ }
+  const vt = new THREE.VideoTexture(video);
+  vt.colorSpace = THREE.NoColorSpace; vt.minFilter = THREE.LinearFilter; vt.magFilter = THREE.LinearFilter; vt.generateMipmaps = false;
+  shared.uVideo.value = vt;
+  shared.uHas.value = 1;
+  camOn = true;
+  night.visible = false;
+  backdrop.visible = true;
+  updateFov();
+}
+// Sparks are light, so they vanish against a bright view. Dim the feed to suit, like stopping a camera down.
+const lumC = document.createElement('canvas'); lumC.width = lumC.height = 16;
+const lumX = lumC.getContext('2d', { willReadFrequently: true });
+let lumT = 0, gainTarget = .8;
+function autoDim(dt) {
+  camGain.value += (gainTarget - camGain.value) * (1 - Math.exp(-dt * 2));
+  lumT -= dt;
+  if (lumT > 0 || !camOn || !video.videoWidth) return;
+  lumT = 1;
+  try {
+    lumX.drawImage(video, 0, 0, 16, 16);
+    const d = lumX.getImageData(0, 0, 16, 16).data;
+    let s = 0;
+    for (let i = 0; i < d.length; i += 4) s += .3 * d[i] + .59 * d[i + 1] + .11 * d[i + 2];
+    const lum = s / (d.length / 4) / 255;
+    gainTarget = clamp(.17 / Math.max(lum, .02), .2, .92);
+    ambLum = lum * gainTarget;
+  } catch (e) { /* frame not ready */ }
+}
+
+/* ---------- Input ---------- */
+let playing = false, press = null, uiHidden = false;
+const REPEAT = .45;
+const fingers = new Map();
+function toggleUi(force) {
+  uiHidden = force === undefined ? !uiHidden : force;
+  $('ui').hidden = uiHidden;
+  if (uiHidden) hint('Controls hidden for recording. Two-finger tap brings them back.', 2400);
+}
+stage.addEventListener('pointerdown', (e) => {
+  if (!playing || (e.target.closest && e.target.closest('button, #picker'))) return;
+  e.preventDefault();
+  ensureAudio();
+  fingers.set(e.pointerId, performance.now());
+  if (fingers.size === 2 && e.pointerType === 'touch') {
+    const first = Math.min(...fingers.values());
+    if (performance.now() - first < 320) { toggleUi(); press = null; return; }
+  }
+  press = { id: e.pointerId, x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY, dragged: false, t: 0, fired: false, mouse: e.pointerType === 'mouse' };
+  try { stage.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+  if (gyro) { fireAt(e.clientX, e.clientY); press.fired = true; hintEl.classList.remove('show'); }
+});
+stage.addEventListener('pointermove', (e) => {
+  if (!press || e.pointerId !== press.id) return;
+  const dx = e.clientX - press.x, dy = e.clientY - press.y;
+  press.x = e.clientX; press.y = e.clientY;
+  if (Math.hypot(e.clientX - press.sx, e.clientY - press.sy) > 8) press.dragged = true;
+  if (!gyro && press.dragged) {
+    const k = (camera.fov * DEG) / H, s = press.mouse ? -1 : 1;
+    look.yaw += dx * k * s; look.pitch += dy * k * s;
+  }
+});
+function endPress(e) {
+  fingers.delete(e.pointerId);
+  if (!press || e.pointerId !== press.id) return;
+  if (!gyro && !press.dragged && !press.fired && e.type === 'pointerup') { fireAt(e.clientX, e.clientY); hintEl.classList.remove('show'); }
+  press = null;
+}
+stage.addEventListener('pointerup', endPress);
+stage.addEventListener('pointercancel', endPress);
+stage.addEventListener('contextmenu', (e) => e.preventDefault());
+function holdRepeat(dt) {
+  if (!press || mode !== 'sky' || ['finale', 'twelve'].includes(selected.sky) || (!gyro && press.dragged)) return;
+  press.t += dt;
+  if (press.t >= REPEAT) { press.t = 0; press.fired = true; fireAt(press.x, press.y); }
+}
+function applyMute() {
+  if (master) master.gain.value = muted ? 0 : .9;
+  $('icoSound').hidden = muted; $('icoMuted').hidden = !muted;
+  $('muteBtn').setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound');
+}
+$('muteBtn').addEventListener('click', () => { muted = !muted; ensureAudio(); applyMute(); if (LOG) LOG.st.muted = muted; });
+$('hideBtn').addEventListener('click', () => toggleUi(true));
+
+// Silence the moment the page isn't on screen.
+document.addEventListener('visibilitychange', () => {
+  if (!actx) return;
+  if (document.hidden) actx.suspend(); else if (playing) actx.resume();
+});
+
+/* ---------- Visitor log (host research) ----------
+   Sends two records per visit to /api/log (a Vercel function that writes them to the
+   project's Vercel logs): a profile record on arrival, and a summary when the tab hides
+   or the page unloads. Every field is best effort; when a permission or API is missing
+   the record simply omits it and the app is unaffected. */
+const LOG = (() => {
+  // A first-party cookie outlives localStorage (a year, until the user clears it), so the
+  // identity is kept in both; either one found means "this browser has been here before".
+  // The format is id:n:firstTs, where n is the number of visits already seen.
+  let vid, visitNo = 1, firstTs = Date.now();
+  try {
+    const cm = document.cookie.match(/(?:^|;\s*)pataka_vid=([^;]+)/);
+    const raw = (cm && cm[1]) || localStorage.getItem('pataka.visitor');
+    if (raw) {
+      if (raw[0] === '{') { // an older JSON format ({id, ts, n}) in storage
+        const cur = JSON.parse(raw);
+        if (cur.id) { vid = cur.id; visitNo = (cur.n || 0) + 1; firstTs = cur.ts || Date.now(); }
+      } else if (raw.includes(':')) {
+        const p = raw.split(':');
+        vid = p[0];
+        visitNo = (parseInt(p[1], 10) || 0) + 1;
+        firstTs = parseInt(p[2], 10) || Date.now();
+      }
+    }
+    if (!vid) { vid = 'v' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36); firstTs = Date.now(); }
+    const save = vid + ':' + (visitNo - 1) + ':' + firstTs;
+    localStorage.setItem('pataka.visitor', save);
+    document.cookie = 'pataka_vid=' + save + '; path=/; max-age=31536000; SameSite=Lax' + (window.isSecureContext ? '; Secure' : '');
+  } catch (e) { vid = 'anon-' + Math.random().toString(36).slice(2, 8); }
+  const t0 = performance.now();
+  const st = { cam: 'not-started', motion: 'not-started', geo: null, geoDenied: false, muted: false, hiddenMs: 0, lastHide: 0, battery: null };
+  const ua = navigator.userAgent;
+  function browser() {
+    if (/Edg\//.test(ua)) return 'Edge';
+    if (/OPR\//.test(ua) || /Opera/.test(ua)) return 'Opera';
+    if (/Samsung Internet/.test(ua)) return 'Samsung Internet';
+    if (/Chrome\//.test(ua)) return 'Chrome';
+    if (/Firefox\//.test(ua)) return 'Firefox';
+    if (/CriOS/.test(ua)) return 'Safari (Chromium)';
+    if (/Safari/.test(ua)) return /iPhone|iPad|iPod/.test(ua) ? 'Safari (iOS)' : 'Safari';
+    return 'unknown';
+  }
+  function os() {
+    if (/Windows/.test(ua)) return 'Windows';
+    if (/Android/.test(ua)) return 'Android';
+    if (/iPhone|iPad|iPod/.test(ua)) return 'iOS';
+    if (/Mac OS X/.test(ua)) return 'macOS';
+    if (/CrOS/.test(ua)) return 'ChromeOS';
+    if (/Linux/.test(ua)) return 'Linux';
+    return 'unknown';
+  }
+  function deviceClass() { return /iPhone/.test(ua) ? 'phone' : /iPad/.test(ua) ? 'tablet' : /Android/.test(ua) ? 'phone' : innerWidth < 720 ? 'phone' : 'desktop'; }
+  // Android UAs carry the model; iOS UAs only carry iPhone/iPad, so best effort.
+  function deviceModel() {
+    let m = ua.match(/Android [\d.]+; ([^;)]+) Build/);
+    if (m) return m[1];
+    m = ua.match(/; (iPhone|iPad|iPod); CPU/);
+    if (m) return m[1];
+    return null;
+  }
+  function profile() {
+    const c = navigator.connection;
+    return {
+      s: vid, visitNo, firstTs,
+      ua, browser: browser(), os: os(),
+      device: deviceClass(), model: deviceModel(),
+      lang: navigator.language, langs: navigator.languages,
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      screen: [screen.width, screen.height], dpr: window.devicePixelRatio || 1,
+      colorDepth: screen.colorDepth,
+      touch: 'ontouchstart' in window, cores: navigator.hardwareConcurrency,
+      memGB: navigator.deviceMemory ? navigator.deviceMemory : null,
+      conn: c ? { type: c.type, eff: c.effectiveType, downlink: c.downlink, rtt: c.rtt, saveData: c.saveData } : null,
+      battery: st.battery,
+      reducedMotion, secure: window.isSecureContext,
+      geo: st.geo,
+    };
+  }
+  // Optional, user-consented GPS; only attempted on visits that last more than 15 s.
+  function tryGeo() {
+    if (!navigator.geolocation || st.geo || st.geoDenied) return;
+    if (performance.now() - t0 < 15000) return;
+    navigator.geolocation.getCurrentPosition(
+      (p) => { st.geo = { lat: +p.coords.latitude.toFixed(4), lng: +p.coords.longitude.toFixed(4), accM: Math.round(p.coords.accuracy) }; st.geoGranted = true; },
+      () => { st.geoDenied = true; },
+      { timeout: 4000, maximumAge: 600000 }
+    );
+  }
+  function post(e, extra) {
+    const body = Object.assign({ e }, profile(), extra || {});
+    const json = JSON.stringify(body);
+    try {
+      if (navigator.sendBeacon) {
+        if (navigator.sendBeacon('api/log', new Blob([json], { type: 'application/json' }))) return;
+      }
+      fetch('api/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: json, keepalive: true }).catch(() => {});
+    } catch (err) { /* offline or file: — nothing to do */ }
+  }
+  let exited = false;
+  function summary() {
+    return {
+      timeMs: Math.round(performance.now() - t0 - st.hiddenMs),
+      cam: st.cam, motion: st.motion, geo: st.geo, geoDenied: st.geoDenied,
+      muted: st.muted, mode, selected, used,
+      orientation: scrAngle ? scrAngle() : null,
+      playing,
+    };
+  }
+  function exit() {
+    if (exited) return; exited = true;
+    post('x', summary());
+  }
+  addEventListener('pagehide', exit);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { st.lastHide = performance.now(); post('x', summary()); }
+    else st.hiddenMs += performance.now() - st.lastHide;
+  });
+  addEventListener('beforeunload', exit);
+  if (navigator.getBattery) navigator.getBattery().then((b) => { st.battery = { level: Math.round(b.level * 100), charging: b.charging }; }).catch(() => {});
+  setTimeout(tryGeo, 16000); // ask only if the visitor is still here
+  // Record the arrival.
+  post('v', { geo: st.geo });
+  return { st, post, summary };
+})();
+
+$('startBtn').addEventListener('click', async () => {
+  const btn = $('startBtn');
+  btn.disabled = true; btn.textContent = 'Starting…';
+  ensureAudio();
+  let motion = 'granted';
+  if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+    try { motion = await DeviceOrientationEvent.requestPermission(); } catch (e) { motion = 'denied'; }
+  }
+  st.motion = motion;
+  const camP = startCamera();
+  try { await camP; st.cam = 'granted'; } catch (e) { st.cam = 'denied'; } /* carries on over the painted night */
+  if (!orient.ok) await new Promise((r) => setTimeout(r, 400));
+  gyro = orient.ok && motion === 'granted';
+  try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) { /* not granted */ }
+  look.yaw = 0; look.pitch = .12;
+  playing = true;
+  distantT = 2;
+  $('start').hidden = true;
+  $('ui').hidden = false;
+  renderPicker();
+  applyMute();
+  if (!camOn && !gyro) hint('No camera or motion here. Drag to look around, drag down for the ground, tap to burst.', 6000);
+  else if (!gyro) hint('Motion is off. Drag to look around, tap to burst.', 5000);
+  else if (!camOn) hint('Camera is off, so this is a painted night sky. Tap to burst.', 5000);
+  else hint('Tap anywhere to burst it there. Tilt down for bombs and walas.', 4600);
+});
+
+/* ---------- Surface ring ---------- */
+const ring = new THREE.Mesh(new THREE.RingGeometry(.3, .307, 72).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xffae2b, transparent: true, opacity: 0, side: THREE.DoubleSide, depthTest: false, depthWrite: false, toneMapped: false }));
+ring.frustumCulled = false; ring.renderOrder = 4;
+scene.add(ring);
+function updateRing(time) {
+  const target = playing && mode === 'ground' && !uiHidden ? .6 : 0;
+  ring.material.opacity += (target - ring.material.opacity) * .18;
+  ring.visible = ring.material.opacity > .01;
+  if (!ring.visible) return;
+  ring.position.copy(floorPoint(fwd));
+  ring.position.y = floorY + .005;
+  ring.scale.setScalar(1 + Math.sin(time * 3.2) * .06);
+}
+
+/* ---------- Safety check: keep crackers away from what could catch fire ----------
+   On-device object detection over the live camera (TensorFlow.js + COCO-SSD; the video
+   never leaves the phone). When it spots something that should not be next to a cracker
+   - a plant, a vehicle, an animal, a person - the banner asks to move to an open area.
+   The banner intentionally stays up even when the controls are hidden for recording. */
+const HAZARDS = { 'potted plant': 1, car: 1, truck: 1, bus: 1, motorcycle: 1, bicycle: 1, boat: 1, train: 1, bird: 1, cat: 1, dog: 1, horse: 1, sheep: 1, cow: 1, elephant: 1, bear: 1, zebra: 1, giraffe: 1, person: 1 };
+const safeEl = $('safeWarn');
+const det = { model: null, busy: false, clearStreak: 0, shown: false };
+async function detLoad() {
+  if (det.model || !window.cocoSsd || !window.tf) return;
+  try { det.model = await window.cocoSsd.load({ baseNet: 'lite_mobilenet_v2' }); }
+  catch (e) { /* weights need a connection; the safety check just won't run */ }
+}
+function detShow(label) {
+  safeEl.hidden = false;
+  safeEl.innerHTML = '<strong>Something is nearby (' + label + ').</strong><br>Objects detected in front of you - please burn the crackers in an open area.';
+  det.shown = true;
+}
+function detHide() { safeEl.hidden = true; det.shown = false; }
+async function detScan() {
+  if (det.shown && !camOn) detHide(); // painted night sky: nothing in front of the phone
+  if (!det.model || det.busy || !camOn || document.hidden || video.readyState < 2) return;
+  det.busy = true;
+  let found = null;
+  try {
+    const preds = await det.model.detect(video, 200, .55);
+    for (const p of preds) if (HAZARDS[p.class] && p.score >= .55) { found = p.class; break; }
+  } catch (e) { /* frame not ready yet */ }
+  det.busy = false;
+  if (found) { det.clearStreak = 0; detShow(found); }
+  else if (++det.clearStreak >= 2) detHide(); // two clean scans in a row before hiding
+}
+setInterval(() => { detLoad().then(detScan); }, 2200);
+
+/* ---------- Loop ---------- */
+let last = performance.now(), attractT = 1, distantT = 3, frameEma = 16, qualT = 3;
+function attract(dt) {
+  attractT -= dt;
+  if (attractT > 0) return;
+  attractT = rand(1.5, 2.6);
+  const p = rayAt(rand(.25, .75) * W, rand(.1, .22) * H).multiplyScalar(rand(105, 130));
+  pick([peony, chrysanthemum, goldenRain, crackling])(p, true);
+}
+function adaptQuality(rawDt, dt) {
+  frameEma += (rawDt * 1000 - frameEma) * .05;
+  qualT -= dt;
+  if (qualT > 0 || quality <= .6 || !playing) return;
+  qualT = 2;
+  if (frameEma > 25) { quality = .6; resize(); }
+}
+function step(now) {
+  const raw = Math.max(0, (now - last) / 1000), dt = Math.min(.05, raw);
+  last = now;
+  const time = now / 1000;
+  if (!playing) { look.yaw = Math.sin(time * .1) * .04; look.pitch = .14; attract(dt); }
+  updateCamera(dt);
+  poolN = 0;
+  if (playing) {
+    holdRepeat(dt); autoDim(dt); adaptQuality(raw, dt);
+    distantT -= dt;
+    if (distantT <= 0) { distantT = rand(2.5, 8); sfx.distant(); }
+  }
+  for (let i = emitters.length - 1; i >= 0; i--) if (!emitters[i].update(dt)) emitters.splice(i, 1);
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const f = pulses[i];
+    floorGlow(f.x, f.z, f.c, f.i, f.r);
+    f.i -= f.i * f.d * dt + dt * .3;
+    if (f.i <= .02) pulses.splice(i, 1);
+  }
+  for (let i = poolN; i < pools.length; i++) pools[i].visible = false;
+  updateSparks(dt);
+  updateSmoke(dt);
+  updateRing(time);
+  if (sceneLight > .002) {
+    skyLight.visible = true;
+    skyLight.material.uniforms.uC.value.setRGB(sceneLightC.x * sceneLight, sceneLightC.y * sceneLight, sceneLightC.z * sceneLight);
+    sceneLight *= Math.exp(-dt * 7);
+  } else skyLight.visible = false;
+  if (shake > 0) {
+    shake = Math.max(0, shake - dt * 2.4);
+    sceneEl.style.transform = shake > 0 ? `translate(${rand(-9, 9) * shake}px, ${rand(-9, 9) * shake}px) scale(1.03)` : '';
+  }
+  renderer.render(scene, camera);
+}
+function frame(now) { requestAnimationFrame(frame); step(now); }
+
+resize();
+renderPicker();
+if (!window.isSecureContext) { $('note').textContent = 'The camera and motion sensors only work from an https:// link. Here you get a painted night sky.'; $('note').hidden = false; }
+if (location.hash === '#debug') window.__p = { tick(n = 1, ms = 16.7) { for (let i = 0; i < n; i++) step(last + ms); }, look, selected, fireAt, setMode, get alive() { return aliveCount; }, get mode() { return mode; }, emitters, get W() { return W; }, get H() { return H; }, get floorY() { return floorY; }, get quality() { return quality; }, setPlaying(v) { playing = v; }, setGyro(v) { gyro = v; primed = false; }, pools,
+  fakeCam(paint) { const c = document.createElement('canvas'); c.width = 720; c.height = 1280; paint(c.getContext('2d'), 720, 1280); setInterval(() => paint(c.getContext('2d'), 720, 1280), 200); return attachFeed(c.captureStream(10)); } };
+window.__ready = true;
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
