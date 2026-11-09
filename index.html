@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="Diwali firecrackers through your phone's camera. Tap the sky to burst a shell, or tilt down and set off bombs and walas on the ground.">
-<title>Ecodiwiki</title>
+<title>Ecodiwali</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%23ffae2b' stroke-width='5' stroke-linecap='round'%3E%3Cpath d='M32 6v14M32 44v14M6 32h14M44 32h14M14 14l10 10M40 40l10 10M50 14L40 24M24 40L14 50'/%3E%3C/g%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -128,7 +128,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 <section id="start" aria-labelledby="title">
   <small>Happy Diwali</small>
-  <h1 id="title">Ecodiwiki</h1>
+  <h1 id="title">Ecodiwali</h1>
   <p id="lede">Tap the sky to burst a firework. Tilt down to set off bombs.</p>
   <button id="startBtn" type="button">Start</button>
   <p class="fine" id="note" hidden></p>
@@ -1309,8 +1309,8 @@ const LOG = (() => {
   // The format is id:n:firstTs, where n is the number of visits already seen.
   let vid, visitNo = 1, firstTs = Date.now();
   try {
-    const cm = document.cookie.match(/(?:^|;\s*)ecodiwiki_vid=([^;]+)/);
-    const raw = (cm && cm[1]) || localStorage.getItem('ecodiwiki.visitor');
+    const cm = document.cookie.match(/(?:^|;\s*)ecodiwali_vid=([^;]+)/);
+    const raw = (cm && cm[1]) || localStorage.getItem('ecodiwali.visitor');
     if (raw) {
       if (raw[0] === '{') { // an older JSON format ({id, ts, n}) in storage
         const cur = JSON.parse(raw);
@@ -1324,8 +1324,8 @@ const LOG = (() => {
     }
     if (!vid) { vid = 'v' + Math.random().toString(36).slice(2, 8) + Date.now().toString(36); firstTs = Date.now(); }
     const save = vid + ':' + (visitNo - 1) + ':' + firstTs;
-    localStorage.setItem('ecodiwiki.visitor', save);
-    document.cookie = 'ecodiwiki_vid=' + save + '; path=/; max-age=31536000; SameSite=Lax' + (window.isSecureContext ? '; Secure' : '');
+    localStorage.setItem('ecodiwali.visitor', save);
+    document.cookie = 'ecodiwali_vid=' + save + '; path=/; max-age=31536000; SameSite=Lax' + (window.isSecureContext ? '; Secure' : '');
   } catch (e) { vid = 'anon-' + Math.random().toString(36).slice(2, 8); }
   const t0 = performance.now();
   const st = { cam: 'not-started', motion: 'not-started', geo: null, geoDenied: false, muted: false, hiddenMs: 0, lastHide: 0, battery: null };
