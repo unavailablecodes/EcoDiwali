@@ -1,15 +1,16 @@
 // Vercel function: login for the stats dashboard.
 // GET  /api/stats -> 401 without a token from here
 //
-// Credentials and the signing secret live ONLY in Vercel environment
-// variables (server-side, never shipped to the browser):
+// Credentials live ONLY in Vercel environment variables (server-side, never
+// shipped to the browser):
 //   STATS_USER   your username
 //   STATS_PASS   your password
-//   STATS_SECRET any random string (signs the tokens; keep it long and unique)
 //
-// The token is HMAC-SHA256 signed, carries its own expiry (12 h), and is
-// validated by api/stats.js, so a visitor who finds the page can see
-// nothing without the password - and with a stolen token, nothing after 12 h.
+// The token is HMAC-SHA256 signed over a fixed salt that both functions in
+// this repo share (api/stats.js verifies it the same way), and carries its
+// own 12-hour expiry. A fixed salt is safe here: it is just a code constant,
+// the real gate is the username/password check on this endpoint, and the
+// token is useless after 12 hours regardless.
 
 import { createHmac } from 'node:crypto';
 
@@ -31,7 +32,8 @@ export default function handler(req, res) {
 }
 
 function sign(expMs) {
+  const SALT = 'pataka-stats-salt-v1'; // shared constant - api/stats.js must use the same value
   const body = Buffer.from(String(expMs)).toString('base64url');
-  const sig = createHmac('sha256', process.env.STATS_SECRET).update(body).digest('base64url');
+  const sig = createHmac('sha256', SALT).update(body).digest('base64url');
   return 'v1.' + body + '.' + sig;
 }

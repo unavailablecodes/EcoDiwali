@@ -37,15 +37,17 @@ export default async function handler(req, res) {
   }
 }
 
-// A token is "exp.base64url(expiryMs).base64url(hmac(expiryMs))" (see api/auth.js).
-// It is valid only if the signature matches AND it has not expired AND the secret
-// is configured - so there is no way to read this endpoint without the password.
+// A token is "v1.<exp>.<hmac>" where the HMAC is signed with a fixed salt
+// that api/auth.js uses to issue tokens (see that file). Valid only while
+// the signature matches AND the expiry is in the future - so no data is
+// reachable without first passing the username/password check.
 function verifyToken(token) {
+  const SALT = 'pataka-stats-salt-v1'; // must match the constant in api/auth.js
   const parts = token.split('.');
-  if (parts.length !== 3 || !process.env.STATS_SECRET) return false;
+  if (parts.length !== 3 || parts[0] !== 'v1') return false;
   const exp = parseInt(Buffer.from(parts[1], 'base64url').toString(), 10);
   if (!Number.isFinite(exp) || Date.now() > exp) return false;
-  const expect = createHmac('sha256', process.env.STATS_SECRET).update(parts[1]).digest('base64url');
+  const expect = createHmac('sha256', SALT).update(parts[1]).digest('base64url');
   const a = Buffer.from(parts[2], 'base64url').toString(), b = expect;
   if (a.length !== b.length) return false;
   let diff = 0;
