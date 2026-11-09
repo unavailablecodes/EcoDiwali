@@ -2,7 +2,7 @@
 // serve the dashboard (stats/index.html), while /api/* requests on that host
 // still reach the serverless functions. On the main host, /stats does the same.
 //
-// So:  https://ecodiwiki.vercel.app/stats  and  https://stats.ecodiwiki.vercel.app
+// So:  https://ecodiwali.vercel.app/stats  and  https://stats.ecodiwali.vercel.app
 // both open the login-gated live dashboard; everything else on the main host
 // (the fireworks app at /, /api/log, ...) is untouched.
 
