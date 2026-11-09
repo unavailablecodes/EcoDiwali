@@ -1,5 +1,5 @@
 // Vercel serverless function: receives visitor analytics from index.html and
-// stores one row per record in Supabase (public.ecodiwali_events).
+// stores one row per record in Supabase (public.ecodiwiki_events).
 //
 // Setup, one time:
 //   1. Run supabase/schema.sql in your Supabase project (SQL Editor -> Run).
@@ -17,7 +17,7 @@
 //
 // Records are batched one insert per request (each request is already a single
 // JSON line). If Supabase is unreachable, the record is also written to the
-// Vercel function log as [ecodiwali] so nothing is silently lost.
+// Vercel function log as [ecodiwiki] so nothing is silently lost.
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
@@ -52,8 +52,8 @@ export default async function handler(req, res) {
   const saved = await saveToSupabase(row);
 
   // Always keep a copy in the function log too - cheap insurance and handy for
-  // debugging: `vercel logs <url> | grep ecodiwali`.
-  console.log('[ecodiwali] ' + JSON.stringify({ ...row, app_ts: new Date().toISOString() }));
+  // debugging: `vercel logs <url> | grep ecodiwiki`.
+  console.log('[ecodiwiki] ' + JSON.stringify({ ...row, app_ts: new Date().toISOString() }));
   res.status(202).json({ ok: true, saved });
 }
 
@@ -62,7 +62,7 @@ async function saveToSupabase(row) {
   if (!url || !key) return false; // not configured yet: log-only mode
 
   try {
-    const r = await fetch(`${url.replace(/\/$/, '')}/rest/v1/ecodiwali_events`, {
+    const r = await fetch(`${url.replace(/\/$/, '')}/rest/v1/ecodiwiki_events`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -74,12 +74,12 @@ async function saveToSupabase(row) {
       signal: AbortSignal.timeout(8000),
     });
     if (!r.ok) {
-      console.error('[ecodiwali] supabase insert failed:', r.status, (await r.text()).slice(0, 300));
+      console.error('[ecodiwiki] supabase insert failed:', r.status, (await r.text()).slice(0, 300));
       return false;
     }
     return true;
   } catch (e) {
-    console.error('[ecodiwali] supabase insert error:', e.message);
+    console.error('[ecodiwiki] supabase insert error:', e.message);
     return false;
   }
 }
