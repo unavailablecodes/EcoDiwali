@@ -1,4 +1,4 @@
-# Ecodiwiki — deployment & data setup
+# Ecodiwali — deployment & data setup
 
 Diwali AR firecracker web app. Static frontend (`index.html`) + Vercel
 serverless functions: `api/log.js` stores visitor analytics in Supabase,
@@ -14,7 +14,7 @@ serverless functions: `api/log.js` stores visitor analytics in Supabase,
 | `api/log.js` | Vercel function: receives visit/exit records, stamps IP + geo, writes to Supabase |
 | `api/auth.js` | Vercel function: verifies the stats username/password, issues a 12-hour signed token |
 | `api/stats.js` | Vercel function: returns live stats **only** with a valid token (401 otherwise) |
-| `supabase/schema.sql` | Creates the `ecodiwiki_events` table, RLS lock-down, the `ecodiwiki_visitors` view, and the `ecodiwiki_stats()` aggregation function |
+| `supabase/schema.sql` | Creates the `ecodiwali_events` table, RLS lock-down, the `ecodiwali_visitors` view, and the `ecodiwali_stats()` aggregation function |
 | `vercel.json` | Rewrites any `stats.<domain>` subdomain to the dashboard |
 
 ## 1. Supabase (do once)
@@ -22,7 +22,7 @@ serverless functions: `api/log.js` stores visitor analytics in Supabase,
 1. Create a project at https://supabase.com.
 2. Dashboard -> **SQL Editor** -> **New query** -> paste the whole
    `supabase/schema.sql` -> **Run**.
-   - Creates `public.ecodiwiki_events` (raw records) and `public.ecodiwiki_visitors`
+   - Creates `public.ecodiwali_events` (raw records) and `public.ecodiwali_visitors`
      (one row per visitor, for quick stats).
    - Enables Row Level Security with **no policies** — the public `anon` key
      cannot read or write the table; only the service key can.
@@ -50,7 +50,7 @@ serverless functions: `api/log.js` stores visitor analytics in Supabase,
 
 3. Redeploy.
 4. **Stats subdomain:** Project -> **Domains** -> add
-   `stats.<your-project>.vercel.app` (e.g. `stats.ecodiwiki.vercel.app`). The
+   `stats.<your-project>.vercel.app` (e.g. `stats.ecodiwali.vercel.app`). The
    included `vercel.json` rewrites every request on that host to the
    dashboard (`/stats`), while `/api/*` still reaches the functions. The
    dashboard is also reachable at `https://<your-project>.vercel.app/stats`.
@@ -64,10 +64,10 @@ index.html (visit / exit / permission events)
 api/log.js (Vercel function)
    │  stamps: ip, ipapi.co geo (best effort)
    ▼
-Supabase  public.ecodiwiki_events   (one row per event, kept permanently)
+Supabase  public.ecodiwali_events   (one row per event, kept permanently)
               │
-              ├──> public.ecodiwiki_visitors  (stats view, one row per visitor)
-              └──> public.ecodiwiki_stats()   (all dashboard numbers in one DB call)
+              ├──> public.ecodiwali_visitors  (stats view, one row per visitor)
+              └──> public.ecodiwali_stats()   (all dashboard numbers in one DB call)
                         ▲
                         │  live, uncached
              api/stats.js (Vercel function; password-protected)
@@ -95,17 +95,17 @@ In Supabase -> SQL Editor, for example:
 
 ```sql
 -- Everyone who ever visited
-select * from ecodiwiki_visitors order by first_seen desc limit 50;
+select * from ecodiwali_visitors order by first_seen desc limit 50;
 
 -- Who they used, and how long
 select
   count(*)                                        as total_events,
   count(distinct visitor_id)                     as unique_visitors
-from ecodiwiki_events;
+from ecodiwali_events;
 
 -- Which crackers people fire most
 select client->>'used' as crackers, count(*) as n
-from ecodiwiki_events
+from ecodiwali_events
 where event = 'x'
 group by 1
 order by n desc
@@ -113,14 +113,14 @@ limit 20;
 
 -- Visits by city (from IP geo)
 select geo->>'city' as city, geo->>'country' as country, count(distinct visitor_id)
-from ecodiwiki_events
+from ecodiwali_events
 where event = 'v'
 group by 1, 2
 order by 3 desc;
 ```
 
-Or in the Supabase table editor: open `ecodiwiki_events` (raw) or
-`ecodiwiki_visitors` (the rolled-up view).
+Or in the Supabase table editor: open `ecodiwali_events` (raw) or
+`ecodiwali_visitors` (the rolled-up view).
 
 ## Notes & honest limitations
 
@@ -135,8 +135,8 @@ Or in the Supabase table editor: open `ecodiwiki_events` (raw) or
   hard limit of any cookie-based tracking on a static site.
 - **Retention:** Supabase keeps data permanently, unlike Vercel function logs
   (~3 days on free). The function also writes every record to the Vercel log
-  as a `[ecodiwiki]` line, so you have a short-term backup:
-  `vercel logs <your-deployment-url> | grep ecodiwiki`
+  as a `[ecodiwali]` line, so you have a short-term backup:
+  `vercel logs <your-deployment-url> | grep ecodiwali`
 - **Privacy:** IP + location + time can identify individuals. Before you
   publish, add a one-line notice (e.g. "This app logs anonymous usage
   statistics for research"), and disclose it on any site where it links out.

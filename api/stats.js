@@ -2,7 +2,7 @@
 // GET /api/stats?days=30&token=...  ->  { data: {...} }
 //
 // Returns 401 without a valid token issued by api/auth.js. All aggregation
-// happens inside the database (public.ecodiwiki_stats RPC, see supabase/schema.sql).
+// happens inside the database (public.ecodiwali_stats RPC, see supabase/schema.sql).
 // Results are not cached: the dashboard is meant to mirror the database live.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
   if (!url || !key) return res.status(503).json({ error: 'Supabase is not configured yet. Add SUPABASE_URL and SUPABASE_SERVICE_ROLE in the Vercel project settings.' });
 
   try {
-    const r = await fetch(`${url.replace(/\/$/, '')}/rest/v1/rpc/ecodiwiki_stats`, {
+    const r = await fetch(`${url.replace(/\/$/, '')}/rest/v1/rpc/ecodiwali_stats`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
     const data = await r.json();
     res.status(200).json({ data, source: 'supabase', days });
   } catch (e) {
-    console.error('[ecodiwiki-stats]', e.message);
+    console.error('[ecodiwali-stats]', e.message);
     res.status(502).json({ error: e.message });
   }
 }
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
 // the signature matches AND the expiry is in the future - so no data is
 // reachable without first passing the username/password check.
 function verifyToken(token) {
-  const SALT = 'pataka-stats-salt-v1'; // must match the constant in api/auth.js
+  const SALT = 'ecodiwali-stats-salt-v1'; // must match the constant in api/auth.js
   const parts = token.split('.');
   if (parts.length !== 3 || parts[0] !== 'v1') return false;
   const exp = parseInt(Buffer.from(parts[1], 'base64url').toString(), 10);

@@ -32,7 +32,7 @@ export default function handler(req, res) {
 }
 
 function sign(expMs) {
-  const SALT = 'pataka-stats-salt-v1'; // shared constant - api/stats.js must use the same value
+  const SALT = 'ecodiwali-stats-salt-v1'; // shared constant - api/stats.js must use the same value
   const body = Buffer.from(String(expMs)).toString('base64url');
   const sig = createHmac('sha256', SALT).update(body).digest('base64url');
   return 'v1.' + body + '.' + sig;
