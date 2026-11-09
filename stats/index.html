@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<title>Pataka · Stats</title>
+<title>Ecodiwali · Stats</title>
 <style>
 :root {
   /* validated default palette (light) */
@@ -130,7 +130,7 @@ code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background
 </div>
 <div class="wrap" hidden>
   <header>
-    <h1><a href="/">Pataka</a> · Stats</h1>
+    <h1><a href="/">Ecodiwali</a> · Stats</h1>
     <div class="status"><span class="dot" id="dot"></span><span id="statustext">connecting…</span></div>
     <div class="spacer"></div>
     <div class="days" id="days">
@@ -179,7 +179,7 @@ code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background
     <div id="recent"><div class="empty">No data yet.</div></div>
   </div>
 
-  <p class="foot">Synced live from Supabase <code>pataka_events</code> · refreshes every 45 s · source: <a href="/" style="color: inherit">pataka app</a></p>
+  <p class="foot">Synced live from Supabase <code>ecodiwali_events</code> · refreshes every 45 s · source: <a href="/" style="color: inherit">ecodiwali app</a></p>
 </div>
 <div class="tip" id="tip"></div>
 
@@ -188,7 +188,7 @@ code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background
 const $ = (s) => document.querySelector(s);
 const DAYS = 30; let curDays = DAYS;
 const REFRESH_MS = 45000;
-const TOKEN_KEY = 'pataka.stats.token';
+const TOKEN_KEY = 'ecodiwali.stats.token';
 let authToken = sessionStorage.getItem(TOKEN_KEY) || '';
 
 /* ---------- login gate ---------- */
