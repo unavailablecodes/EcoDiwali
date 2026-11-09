@@ -1431,9 +1431,9 @@ $('startBtn').addEventListener('click', async () => {
   if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
     try { motion = await DeviceOrientationEvent.requestPermission(); } catch (e) { motion = 'denied'; }
   }
-  st.motion = motion;
+  LOG.st.motion = motion;
   const camP = startCamera();
-  try { await camP; st.cam = 'granted'; } catch (e) { st.cam = 'denied'; } /* carries on over the painted night */
+  try { await camP; LOG.st.cam = 'granted'; } catch (e) { LOG.st.cam = 'denied'; } /* carries on over the painted night */
   if (!orient.ok) await new Promise((r) => setTimeout(r, 400));
   gyro = orient.ok && motion === 'granted';
   try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) { /* not granted */ }
