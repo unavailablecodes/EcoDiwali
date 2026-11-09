@@ -1,29 +1,27 @@
-// Edge middleware: makes any "stats." subdomain of the project's Vercel domain
-// serve the dashboard (stats/index.html), while /api/* requests on that host
-// still reach the serverless functions. On the main host, /stats does the same.
+// Edge middleware for a PLAIN (non-Next) Vercel project: uses only the
+// standard Web API, because `next/server` is not available here.
 //
-// So:  https://ecodiwiki.vercel.app/stats  and  https://stats.ecodiwiki.vercel.app
-// both open the login-gated live dashboard; everything else on the main host
-// (the fireworks app at /, /api/log, ...) is untouched.
-
-import { NextResponse } from 'next/server';
+// Makes any "stats." subdomain of the project's host serve the dashboard,
+// and maps /stats on the main host to it too. /api/* always passes through
+// to the serverless functions, on every host.
 
 export function middleware(req) {
-  // API requests always pass through to the functions, on every host.
   const url = new URL(req.url);
+  // API requests always reach the functions.
   if (url.pathname.startsWith('/api/')) return;
 
   const host = (req.headers.get('host') || '').toLowerCase();
   const isStatsHost = host.startsWith('stats.');
-  // Main host: only the /stats path maps to the dashboard.
+  // On the main host, only the /stats path maps to the dashboard.
   if (!isStatsHost && url.pathname !== '/stats') return;
 
+  // Returning a new Request = Vercel rewrite to the dashboard page.
   const target = new URL(req.url);
   target.pathname = '/stats';
-  return NextResponse.rewrite(target);
+  target.search = '';
+  return new Request(target, req);
 }
 
-// Run for every non-API path; cheap early returns for everything else.
 export const config = {
   matcher: ['/((?!api/).*)'],
 };
