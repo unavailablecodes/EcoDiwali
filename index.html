@@ -96,7 +96,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { #hint { transition: none; } }
 </style>
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+{ "imports": { "three": "./lib/three.module.min.js" } }
 </script>
 </head>
 <body>
@@ -137,21 +137,43 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 <div id="bootError" hidden>This needs a connection the first time it loads. Check yours and reload.</div>
 
 <script>
-  // Staged boot watchdog: at 9 s the app is likely still downloading on a slow
-  // connection, so say so gently; only after 30 s treat it as a real failure.
+  // Staged boot watchdog: at 9 s the app may still be finishing, so show a calm
+  // note; treat it as a real failure only at 30 s. The note dismisses itself
+  // the moment boot succeeds, so it never lingers after a slow-but-fine load.
+  window.__bootErrs = [];
+  window.addEventListener('error', function (ev) {
+    if (ev.target && ev.target.tagName === 'SCRIPT') window.__bootErrs.push('script: ' + (ev.target.src || 'inline'));
+    window.__bootErrs.length = Math.min(window.__bootErrs.length, 6);
+  }, true);
+  setInterval(function () { if (window.__ready) document.getElementById('bootError').hidden = true; }, 400);
   setTimeout(function () {
     if (window.__ready) return;
     var el = document.getElementById('bootError');
     el.textContent = 'Still loading - your connection is slow. The app starts as soon as it finishes.';
     el.hidden = false;
     setTimeout(function () {
-      if (!window.__ready) el.textContent = 'This needs a connection the first time it loads. Check yours and reload.';
+      if (window.__ready) return;
+      el.textContent = 'This needs a connection the first time it loads. Check yours and reload.';
+      try {
+        var vid = null, mm = document.cookie.match(/(?:^|;\s*)ecodiwiki_vid=([^;]+)/);
+        vid = (mm && mm[1]) || ((localStorage.getItem('ecodiwiki.visitor') || '').split('|')[0] || null);
+        fetch('/api/log', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            e: 'd', s: vid || 'anon', stuck30: 1,
+            errs: window.__bootErrs, onLine: navigator.onLine,
+            gl: !!document.createElement('canvas').getContext('webgl2'),
+            ua: navigator.userAgent.slice(0, 90)
+          })
+        });
+      } catch (e) { /* diagnostics are best-effort */ }
     }, 21000);
   }, 9000);
 </script>
-<!-- Object detection: safety check for plants, vehicles, pets. Runs on-device; the camera
-     feed is never uploaded. Model weights stream in with first load (the app already needs
-     a connection the first time). -->
+<!-- The 3D engine and the safety-check libraries are self-hosted in /lib (same
+     origin as this page), so booting never depends on a foreign CDN. The safety
+     libraries still load lazily - only once a camera feed is live - and fall
+     back to the public CDN if a local copy is missing. Object detection runs
+     on-device; the camera feed is never uploaded. -->
 <!-- The object-detection libraries load lazily in the background, only once a camera
      feed is up - they must not delay booting the app on a slow connection. -->
 
@@ -1489,34 +1511,37 @@ function updateRing(time) {
 const HAZARDS = { 'potted plant': 1, car: 1, truck: 1, bus: 1, motorcycle: 1, bicycle: 1, boat: 1, train: 1, bird: 1, cat: 1, dog: 1, horse: 1, sheep: 1, cow: 1, elephant: 1, bear: 1, zebra: 1, giraffe: 1, person: 1 };
 const safeEl = $('safeWarn');
 const det = { model: null, busy: false, clearStreak: 0, shown: false };
-let safetyLibs = 'idle'; // idle -> loading -> loaded (idle again on failure, so a retry can re-fetch)
-function loadSafetyLibs() {
-  if (safetyLibs !== 'idle') return;
-  safetyLibs = 'loading';
-  const tf = document.createElement('script');
-  tf.src = 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.js';
-  tf.async = true;
-  tf.onload = () => {
-    const c = document.createElement('script');
-    c.src = 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js';
-    c.async = true;
-    c.onload = () => { safetyLibs = 'loaded'; };
-    c.onerror = () => { safetyLibs = 'idle'; }; // allow a later retry
-    document.head.appendChild(c);
-  };
-  tf.onerror = () => { safetyLibs = 'idle'; }; // allow a later retry
-  document.head.appendChild(tf);
+let safetyLibs = 'idle'; // idle -> loading -> loaded (idle again on failure, so a later tick retries)
+function loadScriptOrFb(localSrc, cdnSrc) {
+  return new Promise((resolve, reject) => {
+    const attempt = (src, last) => {
+      const s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => (last ? reject() : attempt(cdnSrc, true)); // self-hosted copy missing - use the public CDN
+      document.head.appendChild(s);
+    };
+    attempt(localSrc, false);
+  });
 }
 async function detLoad() {
   if (det.model) return;
   if (!window.cocoSsd || !window.tf) {
-    // Fetch the ~1.4 MB of safety-check libraries only once there is a live camera
-    // feed to inspect - a painted-sky session never pays for them.
-    if (camOn) loadSafetyLibs();
+    // Fetch the safety-check libraries only once there is a live camera feed to
+    // inspect - a painted-sky session never pays for them. The self-hosted copies
+    // in /lib load from the same origin as the page; the public CDN is the fallback.
+    if (camOn && safetyLibs === 'idle') {
+      safetyLibs = 'loading';
+      try {
+        await loadScriptOrFb('./lib/tf.min.js', 'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.17.0/dist/tf.min.js');
+        await loadScriptOrFb('./lib/coco-ssd.min.js', 'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js');
+        safetyLibs = 'loaded';
+      } catch (e) { safetyLibs = 'idle'; } // retry on a later tick
+    }
     return;
   }
   try { det.model = await window.cocoSsd.load({ baseNet: 'lite_mobilenet_v2' }); }
-  catch (e) { /* weights need a connection; the safety check just won't run */ }
+  catch (e) { /* the safety check just won't run */ }
 }
 function detShow(label) {
   safeEl.hidden = false;
