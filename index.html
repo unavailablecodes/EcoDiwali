@@ -1433,7 +1433,14 @@ $('startBtn').addEventListener('click', async () => {
   }
   LOG.st.motion = motion;
   const camP = startCamera();
-  try { await camP; LOG.st.cam = 'granted'; } catch (e) { LOG.st.cam = 'denied'; } /* carries on over the painted night */
+  // Never gate the entry on the camera: phones can sit on the permission prompt for a
+  // while, or warm up the sensor slowly. Enter within 6s no matter what; the live
+  // feed attaches itself in the background the moment it is actually ready.
+  try {
+    await Promise.race([camP, new Promise(r => setTimeout(r, 6000))]);
+    LOG.st.cam = camOn ? 'granted' : 'pending';
+  } catch (e) { LOG.st.cam = camOn ? 'granted' : 'denied'; }
+  camP.catch(() => { /* the background camera keeps trying; no unhandled rejection */ });
   if (!orient.ok) await new Promise((r) => setTimeout(r, 400));
   gyro = orient.ok && motion === 'granted';
   try { if (navigator.wakeLock) await navigator.wakeLock.request('screen'); } catch (e) { /* not granted */ }
