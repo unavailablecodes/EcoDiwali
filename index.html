@@ -1424,7 +1424,7 @@ const LOG = (() => {
       memGB: navigator.deviceMemory ? navigator.deviceMemory : null,
       conn: c ? { type: c.type, eff: c.effectiveType, downlink: c.downlink, rtt: c.rtt, saveData: c.saveData } : null,
       battery: st.battery,
-      reducedMotion, secure: window.isSecureContext,
+      reduceMotion, secure: window.isSecureContext,
       geo: st.geo,
     };
   }
