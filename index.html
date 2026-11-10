@@ -95,9 +95,6 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 @media (prefers-reduced-motion: reduce) { #hint { transition: none; } }
 </style>
-<script type="importmap">
-{ "imports": { "three": "./lib/three.module.min.js" } }
-</script>
 </head>
 <body>
 
@@ -137,35 +134,58 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 <div id="bootError" hidden>This needs a connection the first time it loads. Check yours and reload.</div>
 
 <script>
-  // Staged boot watchdog: at 9 s the app may still be finishing, so show a calm
-  // note; treat it as a real failure only at 30 s. The note dismisses itself
-  // the moment boot succeeds, so it never lingers after a slow-but-fine load.
+  // Boot watchdog: the app's main module is watched at three stages - a slow
+  // load, a module that crashes, and a genuine 30 s stall. Each stage either
+  // shows a useful on-screen note or writes a diagnostic record to the
+  // analytics endpoint, so a stuck page is never silent.
   window.__bootErrs = [];
+  window.__bootPosted = false;
+  function __postBoot() {
+    if (window.__bootPosted) return;
+    window.__bootPosted = true;
+    try {
+      var cm = (document.cookie || '').split(';').map(function (s) { return s.trim(); })
+        .filter(function (s) { return s.indexOf('ecodiwiki_vid=') === 0; })[0];
+      var vid = cm ? cm.slice('ecodiwiki_vid='.length) : null;
+      if (!vid) vid = (localStorage.getItem('ecodiwiki.visitor') || '').split('|')[0] || null;
+      fetch('/api/log', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          e: 'd', s: vid || 'anon',
+          ready: !!window.__ready, errs: window.__bootErrs,
+          onLine: navigator.onLine,
+          gl: !!document.createElement('canvas').getContext('webgl2'),
+          importmap: !!(HTMLScriptElement.supports && HTMLScriptElement.supports('importmap')),
+          ua: navigator.userAgent.slice(0, 120)
+        })
+      });
+    } catch (e) { /* diagnostics are best-effort */ }
+  }
   window.addEventListener('error', function (ev) {
-    if (ev.target && ev.target.tagName === 'SCRIPT') window.__bootErrs.push('script: ' + (ev.target.src || 'inline'));
-    window.__bootErrs.length = Math.min(window.__bootErrs.length, 6);
+    if (ev.target && ev.target.tagName === 'SCRIPT') {
+      window.__bootErrs.push('script: ' + (ev.target.src || 'inline'));
+    } else if (ev.message) {
+      window.__bootErrs.push('js: ' + ev.message.slice(0, 160));
+      // An uncaught exception means the app's own code died - say so on screen
+      // right away instead of leaving a dead button with no explanation.
+      if (!window.__ready) {
+        var el = document.getElementById('bootError');
+        el.textContent = 'The app could not start on this device. Try reloading; if that fails, use a recent Chrome, Edge, or Safari.';
+        el.hidden = false;
+        __postBoot();
+      }
+    }
+    window.__bootErrs.length = Math.min(window.__bootErrs.length, 8);
   }, true);
   setInterval(function () { if (window.__ready) document.getElementById('bootError').hidden = true; }, 400);
   setTimeout(function () {
     if (window.__ready) return;
-    var el = document.getElementById('bootError');
-    el.textContent = 'Still loading - your connection is slow. The app starts as soon as it finishes.';
-    el.hidden = false;
+    var el2 = document.getElementById('bootError');
+    el2.textContent = 'Still loading - your connection is slow. The app starts as soon as it finishes.';
+    el2.hidden = false;
     setTimeout(function () {
       if (window.__ready) return;
-      el.textContent = 'This needs a connection the first time it loads. Check yours and reload.';
-      try {
-        var vid = null, mm = document.cookie.match(/(?:^|;\s*ecodiwali_vid=([^;]+)/);
-        vid = (mm && mm[1]) || ((localStorage.getItem('ecodiwali.visitor') || '').split('|')[0] || null);
-        fetch('/api/log', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            e: 'd', s: vid || 'anon', stuck30: 1,
-            errs: window.__bootErrs, onLine: navigator.onLine,
-            gl: !!document.createElement('canvas').getContext('webgl2'),
-            ua: navigator.userAgent.slice(0, 90)
-          })
-        });
-      } catch (e) { /* diagnostics are best-effort */ }
+      el2.textContent = 'This needs a connection the first time it loads. Check yours and reload.';
+      __postBoot();
     }, 21000);
   }, 9000);
 </script>
@@ -178,7 +198,7 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
      feed is up - they must not delay booting the app on a slow connection. -->
 
 <script type="module">
-import * as THREE from 'three';
+import * as THREE from './lib/three.module.min.js';
 THREE.ColorManagement.enabled = false; // everything here is hand-graded, so it goes to the screen as written
 
 const $ = (id) => document.getElementById(id);
