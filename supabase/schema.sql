@@ -89,8 +89,9 @@ select jsonb_build_object(
       'total_events', count(*),
       'today_visits', count(*) filter (where event = 'v' and app_ts >= date_trunc('day', now())),
       'avg_time_s', coalesce(round(avg(
-        (client->>'timeMs')::numeric
-        filter (where event = 'x' and coalesce((client->>'timeMs')::numeric, 0) > 0)
+        case when event = 'x' and coalesce((client->>'timeMs')::numeric, 0) > 0
+             then (client->>'timeMs')::numeric
+        end
       ) / 1000)::int, 0)
     ) from public.ecodiwali_events
     where app_ts >= now() - make_interval(days => days)
