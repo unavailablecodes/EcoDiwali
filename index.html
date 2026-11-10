@@ -1638,6 +1638,24 @@ function frame(now) { requestAnimationFrame(frame); step(now); }
 
 resize();
 renderPicker();
+// Pre-compile every shader program before the user does anything, with the
+// hidden objects forced visible for one compile pass. Without it, the very
+// first time the floor, the surface ring or the camera backdrop is drawn,
+// the GPU pays a one-time shader compile on that exact frame - which is the
+// stutter felt when switching between sky and floor.
+{
+  const hidden = [];
+  scene.traverse((o) => { if (o.visible === false) { hidden.push(o); o.visible = true; } });
+  const warmProp = makeProp(G.atom, TEX.atom, 900, .03, 900, .1);        // opaque map program
+  const warmShadow = contactShadow(900, 900, .5, .5);                    // transparent map program
+  const warmInst = new THREE.InstancedMesh(G.wala, new THREE.MeshBasicMaterial({ map: TEX.wala, toneMapped: false }), 2); // instanced wala program
+  scene.add(warmInst);
+  renderer.compile(scene, camera); // program upload happens now; nothing is drawn
+  scene.remove(warmInst);
+  warmInst.geometry = null; warmInst.material.dispose();
+  dropProp(warmProp); warmShadow.material.dispose(); warmShadow.removeFromParent();
+  for (const o of hidden) o.visible = false;
+}
 if (!window.isSecureContext) { $('note').textContent = 'The camera and motion sensors only work from an https:// link. Here you get a painted night sky.'; $('note').hidden = false; }
 if (location.hash === '#debug') window.__p = { tick(n = 1, ms = 16.7) { for (let i = 0; i < n; i++) step(last + ms); }, look, selected, fireAt, setMode, get alive() { return aliveCount; }, get mode() { return mode; }, emitters, get W() { return W; }, get H() { return H; }, get floorY() { return floorY; }, get quality() { return quality; }, setPlaying(v) { playing = v; }, setGyro(v) { gyro = v; primed = false; }, pools,
   fakeCam(paint) { const c = document.createElement('canvas'); c.width = 720; c.height = 1280; paint(c.getContext('2d'), 720, 1280); setInterval(() => paint(c.getContext('2d'), 720, 1280), 200); return attachFeed(c.captureStream(10)); } };
