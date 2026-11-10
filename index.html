@@ -659,13 +659,15 @@ const fwd = new THREE.Vector3();
 let W = 1, H = 1, dpr = 1;
 const tmp = new THREE.Vector3();
 function rayAt(cx, cy) { return new THREE.Vector3((cx / W) * 2 - 1, -(cy / H) * 2 + 1, .5).unproject(camera).sub(camera.position).normalize(); }
-function floorPoint(ray) {
+const _fpOut = new THREE.Vector3();
+function floorPoint(ray, out) {
   let x, z;
   if (ray.y < -.03) { const t = floorY / ray.y; x = ray.x * t; z = ray.z * t; }
   else { const h = Math.hypot(ray.x, ray.z) || 1; x = ray.x / h * 7; z = ray.z / h * 7; }
   const d = Math.hypot(x, z);
   if (d > 8) { x *= 8 / d; z *= 8 / d; }
-  return new THREE.Vector3(x, floorY, z);
+  if (out) return out.set(x, floorY, z);
+  return _fpOut.set(x, floorY, z).clone();
 }
 function panFor(p) { tmp.copy(p).applyMatrix4(camera.matrixWorldInverse); return clamp(tmp.x / Math.max(1, tmp.length()), -1, 1) * .85; }
 function randDir() { const u = Math.random() * 2 - 1, t = Math.random() * TAU, s = Math.sqrt(1 - u * u); return [Math.cos(t) * s, u, Math.sin(t) * s]; }
@@ -1003,7 +1005,7 @@ function chakra(p, spec) {
   const off = rings === 1 ? [[0, 0]] : [[-.16, 0], [.13, .1], [.08, -.14]];
   const spin = [];
   for (let q = 0; q < rings; q++) spin.push(rand(1.6, 2.4) * (q % 2 ? -1 : 1));
-  const K = quality > .8 ? 26 : 14;
+  const K = quality > .8 ? 16 : 10; // smooth ring of fire without particle buffer saturation
   const em = { ground: true, t: -1.2, update(dt) {
     let live = false;
     for (let q = 0; q < rings; q++) {
@@ -1114,22 +1116,45 @@ const KINDS = {
 const selected = { sky: 'rocket', ground: 'atom' };
 const pickerEl = $('picker'), hintEl = $('hint'), modeEl = $('mode'), surfaceBtn = $('surfaceBtn'), catBtn = $('catBtn');
 let mode = 'sky';
-function renderPicker() {
+const pickerButtons = { sky: [], ground: [] };
+let pickerBuilt = false;
+function initPicker() {
+  if (pickerBuilt) return;
+  pickerBuilt = true;
   pickerEl.textContent = '';
-  for (const [id, name] of KINDS[mode]) {
-    const b = document.createElement('button');
-    b.type = 'button'; b.className = 'pick';
-    b.setAttribute('aria-pressed', String(selected[mode] === id));
-    b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[id]}</svg><span>${name}</span>`;
-    b.addEventListener('click', () => {
-      const keep = pickerEl.scrollLeft;
-      selected[mode] = id;
-      renderPicker();
-      pickerEl.scrollLeft = keep;
-      ensureAudio();
-      if (id === 'finale') hint('Tap the sky to set off the finale.', 3000);
-    });
-    pickerEl.appendChild(b);
+  for (const m of ['sky', 'ground']) {
+    const group = document.createElement('div');
+    group.id = 'pick-' + m;
+    group.style.display = m === mode ? 'contents' : 'none';
+    for (const [id, name] of KINDS[m]) {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'pick';
+      b.dataset.id = id;
+      b.dataset.mode = m;
+      b.setAttribute('aria-pressed', String(selected[m] === id));
+      b.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[id]}</svg><span>${name}</span>`;
+      b.addEventListener('click', () => {
+        selected[m] = id;
+        for (const btn of pickerButtons[m]) {
+          btn.setAttribute('aria-pressed', String(btn.dataset.id === id));
+        }
+        ensureAudio();
+        if (id === 'finale') hint('Tap the sky to set off the finale.', 3000);
+      });
+      pickerButtons[m].push(b);
+      group.appendChild(b);
+    }
+    pickerEl.appendChild(group);
+  }
+}
+function renderPicker() {
+  if (!pickerBuilt) { initPicker(); return; }
+  const skyGrp = document.getElementById('pick-sky');
+  const gndGrp = document.getElementById('pick-ground');
+  if (skyGrp) skyGrp.style.display = mode === 'sky' ? 'contents' : 'none';
+  if (gndGrp) gndGrp.style.display = mode === 'ground' ? 'contents' : 'none';
+  for (const btn of pickerButtons[mode] || []) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.id === selected[mode]));
   }
 }
 let hintTimer = 0;
@@ -1243,7 +1268,7 @@ function updateFov() {
 }
 function resize() {
   W = stage.clientWidth || innerWidth; H = stage.clientHeight || innerHeight;
-  dpr = Math.min(devicePixelRatio || 1, quality > .8 ? 2 : 1.35);
+  dpr = Math.min(devicePixelRatio || 1, 1.35); // 1.35x cap prevents 4K overdraw on Retina laptops
   renderer.setPixelRatio(dpr);
   renderer.setSize(W, H, false);
   shared.uRes.value.set(W * dpr, H * dpr);
@@ -1278,7 +1303,7 @@ function autoDim(dt) {
   camGain.value += (gainTarget - camGain.value) * (1 - Math.exp(-dt * 2));
   lumT -= dt;
   if (lumT > 0 || !camOn || !video.videoWidth) return;
-  lumT = 1;
+  lumT = 2.5; // less frequent GPU readback
   try {
     lumX.drawImage(video, 0, 0, 16, 16);
     const d = lumX.getImageData(0, 0, 16, 16).data;
@@ -1518,7 +1543,7 @@ function updateRing(time) {
   ring.material.opacity += (target - ring.material.opacity) * .18;
   ring.visible = ring.material.opacity > .01;
   if (!ring.visible) return;
-  ring.position.copy(floorPoint(fwd));
+  floorPoint(fwd, ring.position);
   ring.position.y = floorY + .005;
   ring.scale.setScalar(1 + Math.sin(time * 3.2) * .06);
 }
@@ -1569,20 +1594,28 @@ function detShow(label) {
   det.shown = true;
 }
 function detHide() { safeEl.hidden = true; det.shown = false; }
+const detCanvas = document.createElement('canvas');
+detCanvas.width = 256; detCanvas.height = 256;
+const detCtx = detCanvas.getContext('2d', { willReadFrequently: true });
+
 async function detScan() {
-  if (det.shown && !camOn) detHide(); // painted night sky: nothing in front of the phone
-  if (!det.model || det.busy || !camOn || document.hidden || video.readyState < 2) return;
+  if (det.shown && !camOn) detHide();
+  // Skip detection while fireworks are actively bursting (avoids frame stutter)
+  if (!det.model || det.busy || !camOn || document.hidden || video.readyState < 2 || aliveCount > 300) return;
   det.busy = true;
   let found = null;
   try {
-    const preds = await det.model.detect(video, 200, .55);
+    // Downscale 1080p video into 256x256 canvas: 30x faster inference, zero frame drop
+    detCtx.drawImage(video, 0, 0, 256, 256);
+    const preds = await det.model.detect(detCanvas, 6, .55);
     for (const p of preds) if (HAZARDS[p.class] && p.score >= .55) { found = p.class; break; }
   } catch (e) { /* frame not ready yet */ }
   det.busy = false;
   if (found) { det.clearStreak = 0; detShow(found); }
-  else if (++det.clearStreak >= 2) detHide(); // two clean scans in a row before hiding
+  else if (++det.clearStreak >= 2) detHide();
 }
-setInterval(() => { detLoad().then(detScan); }, 2200);
+// 6 seconds interval instead of 2.2s: safety notice doesn't need rapid polling
+setInterval(() => { detLoad().then(detScan); }, 6000);
 
 /* ---------- Loop ---------- */
 let last = performance.now(), attractT = 1, distantT = 3, frameEma = 16, qualT = 3;
@@ -1598,7 +1631,7 @@ function adaptQuality(rawDt, dt) {
   qualT -= dt;
   if (qualT > 0 || quality <= .6 || !playing) return;
   qualT = 2;
-  if (frameEma > 25) { quality = .6; resize(); }
+  if (frameEma > 38) { quality = .6; } // lower particle counts without reallocating WebGL backbuffer
 }
 function step(now) {
   const raw = Math.max(0, (now - last) / 1000), dt = Math.min(.05, raw);
