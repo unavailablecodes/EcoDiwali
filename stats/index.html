@@ -201,7 +201,7 @@ $('#gateform').addEventListener('submit', async (e) => {
   msg.textContent = '';
   btn.disabled = true; btn.textContent = 'Signing in…';
   try {
-    const r = await fetch('api/auth', {
+    const r = await fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user: u, pass: p }),
@@ -377,7 +377,7 @@ async function load() {
   if (!authToken) { showGate(); return; }
   dot.className = 'dot'; st.textContent = 'syncing…';
   try {
-    const r = await fetch('api/stats?days=' + curDays + '&token=' + encodeURIComponent(authToken), { cache: 'no-store' });
+    const r = await fetch('/api/stats?days=' + curDays + '&token=' + encodeURIComponent(authToken), { cache: 'no-store' });
     if (r.status === 401 || r.status === 403) { // token expired (or was tampered with)
       authToken = '';
       sessionStorage.removeItem(TOKEN_KEY);
