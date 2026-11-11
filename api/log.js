@@ -29,15 +29,31 @@ export default async function handler(req, res) {
 
   const ip = (req.headers['x-forwarded-for'] || req.headers['cf-connecting-ip'] || req.socket?.remoteAddress || '').split(',')[0].trim() || 'unknown';
 
-  // City-level location from the IP. Free, no key; fails soft.
+  // City-level location from the IP. Free, no key; fails soft. Primary source
+  // is ipinfo.io (reliable) with ipapi.co as a fallback if it ever hiccups.
   let geo = null;
-  try {
-    const r = await fetch(`https://ipapi.co/json/${encodeURIComponent(ip)}`, { signal: AbortSignal.timeout(3000) });
-    if (r.ok) {
-      const g = await r.json();
-      if (g && g.status === 'success') geo = { city: g.city, state: g.region, country: g.country_name, org: g.org, lat: g.latitude, lng: g.longitude };
-    }
-  } catch (e) { /* lookup failed, store without geo */ }
+  for (const src of [
+    (ip) => `https://ipinfo.io/${encodeURIComponent(ip)}/json`,
+    (ip) => `https://ipapi.co/json/${encodeURIComponent(ip)}`,
+  ]) {
+    try {
+      const r = await fetch(src(ip), { signal: AbortSignal.timeout(4000) });
+      if (r.ok) {
+        const g = await r.json();
+        if (g && g.city && g.country) {
+          geo = {
+            city: g.city,
+            state: g.region || g.region_code || null,
+            country: g.country_name || g.country || null,
+            org: g.org || null,
+            lat: g.latitude ?? null,
+            lng: g.longitude ?? null,
+          };
+          break;
+        }
+      }
+    } catch (e) { /* try the next source */ }
+  }
 
   const row = {
     visitor_id: body.s,

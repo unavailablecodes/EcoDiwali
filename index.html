@@ -1426,13 +1426,20 @@ const LOG = (() => {
     if (/Linux/.test(ua)) return 'Linux';
     return 'unknown';
   }
-  function deviceClass() { return /iPhone/.test(ua) ? 'phone' : /iPad/.test(ua) ? 'tablet' : /Android/.test(ua) ? 'phone' : innerWidth < 720 ? 'phone' : 'desktop'; }
-  // Android UAs carry the model; iOS UAs only carry iPhone/iPad, so best effort.
+  function deviceClass() {
+    if (/iPhone|iPod/.test(ua)) return 'phone';
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && 'ontouchstart' in window)) return 'tablet';
+    if (/Android/.test(ua)) return 'phone';
+    return innerWidth < 720 ? 'phone' : 'desktop';
+  }
+  // Best-effort model from the user agent: Android UAs carry it in the first
+  // bracketed segment (older Chrome appends " Build/..."), iOS UAs only expose
+  // the family (iPhone / iPad), and an iPad in "desktop site" mode reports Mac.
   function deviceModel() {
-    let m = ua.match(/Android [\d.]+; ([^;)]+) Build/);
-    if (m) return m[1];
-    m = ua.match(/; (iPhone|iPad|iPod); CPU/);
-    if (m) return m[1];
+    let m;
+    if ((m = ua.match(/Android [\d.]+; ([^;)]+)/))) return m[1].replace(/ Build.*/, '').trim() || null;
+    if ((m = ua.match(/\((iPhone|iPad|iPod);/))) return m[1];
+    if (/Macintosh/.test(ua) && 'ontouchstart' in window) return 'iPad';
     return null;
   }
   function profile() {
