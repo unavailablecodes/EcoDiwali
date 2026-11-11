@@ -190,6 +190,9 @@ const DAYS = 30; let curDays = DAYS;
 const REFRESH_MS = 45000;
 const TOKEN_KEY = 'ecodiwali.stats.token';
 let authToken = sessionStorage.getItem(TOKEN_KEY) || '';
+// ?open=1 -> no-login view: skip the gate and read data through the public
+// flag in /api/stats (owner toggles public access with PUBLIC_OPEN in that file).
+const OPEN = new URLSearchParams(location.search).has('open');
 
 /* ---------- login gate ---------- */
 function showGate() { $('#gate').hidden = false; $('.wrap').hidden = true; }
@@ -231,7 +234,7 @@ $('#gateform').addEventListener('submit', async (e) => {
   }
 });
 
-if (authToken) showDash(); // resume a session within its 12 h window
+if (authToken || OPEN) showDash(); // resume a session within its 12 h window (or public view)
 
 $('#signout').addEventListener('click', () => {
   authToken = '';
@@ -387,11 +390,12 @@ function recentTable(el, rows) {
 /* ---------- load + poll ---------- */
 async function load() {
   const dot = $('#dot'), st = $('#statustext');
-  if (!authToken) { showGate(); return; }
+  if (!authToken && !OPEN) { showGate(); return; }
   dot.className = 'dot'; st.textContent = 'syncing…';
   try {
-    const r = await fetch('/api/stats?days=' + curDays + '&token=' + encodeURIComponent(authToken), { cache: 'no-store' });
-    if (r.status === 401 || r.status === 403) { // token expired (or was tampered with)
+    const qs = '/api/stats?days=' + curDays + (authToken ? '&token=' + encodeURIComponent(authToken) : '&public=1');
+    const r = await fetch(qs, { cache: 'no-store' });
+    if ((r.status === 401 || r.status === 403) && !OPEN) { // token expired (or was tampered with)
       authToken = '';
       sessionStorage.removeItem(TOKEN_KEY);
       showGate();

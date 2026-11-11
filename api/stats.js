@@ -4,12 +4,19 @@
 // Returns 401 without a valid token issued by api/auth.js. All aggregation
 // happens inside the database (public.ecodiwali_stats RPC, see supabase/schema.sql).
 // Results are not cached: the dashboard is meant to mirror the database live.
+//
+// Public access: while PUBLIC_OPEN is true, GET /api/stats?public=1 serves the
+// same data without a token (the dashboard's ?open=1 view uses it). Set it to
+// false and redeploy to make the login the only way in again.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
+const PUBLIC_OPEN = true; // flip to false (and redeploy) to require login again
+
 export default async function handler(req, res) {
   const token = String(req.query?.token || '');
-  if (!verifyToken(token)) return res.status(401).json({ error: 'This stats page is private. Log in first.' });
+  const pub = PUBLIC_OPEN && req.query?.public === '1';
+  if (!verifyToken(token) && !pub) return res.status(401).json({ error: 'This stats page is private. Log in first.' });
 
   const days = Math.min(Math.max(parseInt(req.query?.days, 10) || 30, 1), 365);
   res.setHeader('Cache-Control', 'no-store');
