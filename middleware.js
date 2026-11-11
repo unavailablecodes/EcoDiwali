@@ -11,6 +11,17 @@ export default function middleware(req) {
   // API routes always reach the serverless functions - never intercept.
   if (url.pathname.startsWith('/api/')) return;
 
+  // Every old per-deployment link (e.g. ecodiwali-ab12...-unavailablecodes.
+  // vercel.app, kept bookmarked or shared) still resolves on Vercel and used
+  // to serve whatever build that deployment had - which is where the "login
+  // screen again" reports came from. Route them all to the one clean domain.
+  if (host.endsWith('-unavailablecodes.vercel.app') && host !== 'ecodiwali.vercel.app') {
+    return new Response(null, {
+      status: 308,
+      headers: { Location: `https://ecodiwali.vercel.app${url.pathname === '/' ? '' : url.pathname}${url.search}` },
+    });
+  }
+
   // A stats.* subdomain points at the dashboard (which is served statically
   // at /stats). So: /stats passes through, and anything else on that host
   // (e.g. the bare root) redirects down to /stats. One hop, no loop.
