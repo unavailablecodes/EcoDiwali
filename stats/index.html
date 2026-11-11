@@ -184,7 +184,7 @@ function hideTip() { tip.style.opacity = 0; }
 /* ---------- KPI tiles ---------- */
 function renderKpis(k) {
   $('#kpis').innerHTML = [
-    ['Visitors', fmtNum(k.unique_visitors), 'unique in ' + k.window_days + '-day window'],
+    ['Visitors', fmtNum(k.unique_visitors), 'unique in ' + curDays + '-day window'],
     ['Today', fmtNum(k.today_visits), 'visit events in the last 24 h'],
     ['Events', fmtNum(k.total_events), 'visit + exit records in window'],
     ['Avg. time', fmtTime(k.avg_time_s * 1000), 'on the app, per session'],
