@@ -145,9 +145,9 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
     window.__bootPosted = true;
     try {
       var cm = (document.cookie || '').split(';').map(function (s) { return s.trim(); })
-        .filter(function (s) { return s.indexOf('ecodiwiki_vid=') === 0; })[0];
-      var vid = cm ? cm.slice('ecodiwiki_vid='.length) : null;
-      if (!vid) vid = (localStorage.getItem('ecodiwiki.visitor') || '').split('|')[0] || null;
+        .filter(function (s) { return s.indexOf('ecodiwali_vid=') === 0; })[0];
+      var vid = cm ? cm.slice('ecodiwali_vid='.length) : null;
+      if (!vid) vid = (localStorage.getItem('ecodiwali.visitor') || '').split('|')[0] || null;
       fetch('/api/log', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           e: 'd', s: vid || 'anon',
@@ -236,6 +236,28 @@ renderer.setClearColor(0x000000, 1);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 900);
 scene.add(camera);
+
+// Under memory pressure (4 GB iPhone 13/14 running camera + WebGL + the
+// safety model at once) Safari reclaims the WebGL context mid-session. Three
+// recovers its state automatically when the context is restored, but in the
+// meantime the user sees a dead canvas with no explanation - the exact
+// "nothing is working" report those phones produce. Detect it, tell them,
+// and post a diagnostic so a freeze is never silent again.
+const glLostEl = document.createElement('div');
+glLostEl.id = 'glLost';
+glLostEl.hidden = true;
+glLostEl.style.cssText = 'position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:60;max-width:340px;text-align:center;background:#231b33;color:#fff;padding:12px 14px;border-radius:10px;font:14px/1.5 system-ui, sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+document.body.appendChild(glLostEl);
+glCanvas.addEventListener('webglcontextlost', (e) => {
+  e.preventDefault(); // let the browser try to restore in place instead of killing the canvas
+  glLostEl.textContent = 'Your phone reclaimed the graphics to save memory - recovering… If the picture does not come back in a moment, reload the page.';
+  glLostEl.hidden = false;
+  if (LOG.post) LOG.post('d', { glLost: true, cam: LOG.st.cam, motion: LOG.st.motion });
+});
+glCanvas.addEventListener('webglcontextrestored', () => {
+  renderer.compile(scene, camera); // shader programs re-upload after a context restore
+  glLostEl.hidden = true;
+});
 
 // Painted night, used on the start screen and when there is no camera.
 function buildNight() {
@@ -563,7 +585,15 @@ function ensureAudio() {
     verbIn = actx.createGain();
     verbIn.connect(verb); verb.connect(master);
   }
-  if (actx.state !== 'running') actx.resume(); // iOS parks it as "interrupted" when the camera starts
+  // iOS Safari parks the audio session when the camera takes over the
+  // hardware, so re-assert the playback route and pull the context back to
+  // running on every call - otherwise the next burst is silent (the "mute
+  // button does nothing" symptom on iPhone).
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
+  if (actx.state !== 'running') actx.resume();
+  // Safari by default plays Web Audio through the tiny earpiece, which
+  // sounds "dead" next to the ringtones. Route it to the loudspeaker.
+  try { if (navigator.audioSession && navigator.audioSession.setAudiobusRoutingAllowed) navigator.audioSession.setAudiobusRoutingAllowed(true, 'speaker'); } catch (e) {}
 }
 addEventListener('touchend', () => { if (playing) ensureAudio(); }, { passive: true });
 function route(node, pan, wet) {
@@ -1286,6 +1316,10 @@ async function startCamera() {
 async function attachFeed(stream) {
   video.srcObject = stream;
   try { await video.play(); } catch (e) { /* inline muted video normally plays */ }
+  // The camera grabbing the hardware interrupts the Web Audio session on iOS;
+  // re-wake it so the next burst is not silent (unconditional: safe to call
+  // before entry - resume() outside a gesture just no-ops where it can't).
+  ensureAudio();
   const vt = new THREE.VideoTexture(video);
   vt.colorSpace = THREE.NoColorSpace; vt.minFilter = THREE.LinearFilter; vt.magFilter = THREE.LinearFilter; vt.generateMipmaps = false;
   shared.uVideo.value = vt;
@@ -1609,6 +1643,10 @@ async function detScan() {
   if (det.shown && !camOn) detHide();
   // Skip detection while fireworks are actively bursting (avoids frame stutter)
   if (!det.model || det.busy || !camOn || document.hidden || video.readyState < 2 || aliveCount > 300) return;
+  // When the frame-rate governor has already downgraded rendering on this
+  // device, it is a low-memory phone - running a second ML inference pass
+  // there is what tips the 4 GB iPhone 13/14 into context loss. Stand down.
+  if (quality < .8) return;
   det.busy = true;
   let found = null;
   try {

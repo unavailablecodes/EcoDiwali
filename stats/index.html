@@ -283,10 +283,14 @@ function osSplit(el, items) {
 function recentTable(el, rows) {
   if (!rows || !rows.length) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
   el.innerHTML = '<div style="overflow-x:auto"><table><thead><tr>' +
-    '<th>Visitor</th><th>First seen</th><th>Last seen</th><th>Visits</th><th>Time</th><th>Device</th><th>Location</th>' +
+    '<th>User</th><th>First seen</th><th>Last seen</th><th>Visits</th><th>Time</th><th>Device</th><th>Location</th>' +
     '</tr></thead><tbody>' +
     rows.map((r) =>
-      '<tr><td class="num">' + r.id + '</td>' +
+      '<tr><td><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;' +
+        (r.visits > 1
+          ? 'background:var(--series-1);color:#fff'
+          : 'background:var(--grid);color:var(--text-secondary)') + '">' +
+        (r.visits > 1 ? 'Returning' : 'New') + '</span></td>' +
       '<td class="dim">' + fmtDate(r.first_seen) + '</td>' +
       '<td class="dim">' + fmtDate(r.last_seen) + '</td>' +
       '<td class="num">' + fmtNum(r.visits) + '</td>' +
