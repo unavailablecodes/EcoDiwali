@@ -190,9 +190,17 @@ const DAYS = 30; let curDays = DAYS;
 const REFRESH_MS = 45000;
 const TOKEN_KEY = 'ecodiwali.stats.token';
 let authToken = sessionStorage.getItem(TOKEN_KEY) || '';
-// ?open=1 -> no-login view: skip the gate and read data through the public
-// flag in /api/stats (owner toggles public access with PUBLIC_OPEN in that file).
-const OPEN = new URLSearchParams(location.search).has('open');
+// No-login view: when the server has public access switched on (PUBLIC_OPEN in
+// api/stats.js), /api/stats?public=1 answers 200 without a token and this page
+// shows the dashboard directly - no ?open=1 flag, no sign-in. When public
+// access is off the probe 401s and the login gate appears as before.
+let OPEN = new URLSearchParams(location.search).has('open');
+async function probePublic() {
+  try {
+    const r = await fetch('/api/stats?days=30&public=1', { cache: 'no-store' });
+    OPEN = OPEN || r.status === 200;
+  } catch (e) { /* offline or server error: fall back to the login gate */ }
+}
 
 /* ---------- login gate ---------- */
 function showGate() { $('#gate').hidden = false; $('.wrap').hidden = true; }
@@ -234,7 +242,11 @@ $('#gateform').addEventListener('submit', async (e) => {
   }
 });
 
-if (authToken || OPEN) showDash(); // resume a session within its 12 h window (or public view)
+probePublic().then(() => {
+  // Public mode on: open the dashboard directly. A saved login token also
+  // opens it; only when neither is available does the sign-in gate appear.
+  if (authToken || OPEN) showDash();
+});
 
 $('#signout').addEventListener('click', () => {
   authToken = '';
