@@ -112,10 +112,6 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
       <button class="round" id="hideBtn" type="button" aria-label="Hide controls for recording">
         <svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.2A10 10 0 0 1 12 5c6 0 9.500 7 9.500 7a16 16 0 0 1-3.200 4M6.300 6.800A16 16 0 0 0 2.500 12S6 19 12 19a9.500 9.500 0 0 0 4.100-.9"/><path d="M9.900 9.900a3 3 0 0 0 4.200 4.200"/></svg>
       </button>
-      <button class="round" id="muteBtn" type="button" aria-label="Mute sound">
-        <svg viewBox="0 0 24 24" id="icoSound"><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>
-        <svg viewBox="0 0 24 24" id="icoMuted" hidden><path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>
-      </button>
     </div>
     <div id="picker" role="toolbar" aria-label="Firecrackers"></div>
   </div>
@@ -1397,10 +1393,7 @@ function holdRepeat(dt) {
 }
 function applyMute() {
   if (master) master.gain.value = muted ? 0 : .9;
-  $('icoSound').hidden = muted; $('icoMuted').hidden = !muted;
-  $('muteBtn').setAttribute('aria-label', muted ? 'Turn sound on' : 'Mute sound');
 }
-$('muteBtn').addEventListener('click', () => { muted = !muted; ensureAudio(); applyMute(); if (LOG) LOG.st.muted = muted; });
 $('hideBtn').addEventListener('click', () => toggleUi(true));
 
 // Silence the moment the page isn't on screen.
