@@ -88,47 +88,10 @@ td.num { font-variant-numeric: tabular-nums; color: var(--text-primary); }
 code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--grid); border-radius: 4px; padding: 1px 5px; color: var(--text-primary); }
 .foot { font-size: 12px; color: var(--muted); margin-top: 8px; }
 
-/* login gate */
-#gate {
-  position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
-  background: var(--page); padding: 20px;
-}
-#gate [hidden] { display: none !important; }
-.gatebox { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 28px 26px; width: min(360px, 100%); text-align: center; }
-.gatebox .lock { width: 44px; height: 44px; margin: 0 auto 12px; border-radius: 50%; background: var(--grid); display: grid; place-items: center; }
-.gatebox .lock svg { width: 20px; height: 20px; stroke: var(--text-secondary); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-.gatebox h2 { margin: 0 0 4px; font-size: 17px; }
-.gatebox p { margin: 0 0 18px; font-size: 13px; color: var(--muted); }
-.gatebox input {
-  width: 100%; font: inherit; font-size: 14px; padding: 10px 12px; margin-bottom: 10px;
-  border: 1px solid var(--border); border-radius: 9px; background: var(--page); color: var(--text-primary);
-}
-.gatebox input:focus { outline: 2px solid var(--series-1); outline-offset: -1px; }
-.gatebox button {
-  width: 100%; font: inherit; font-size: 14px; font-weight: 600; padding: 10px;
-  border: 0; border-radius: 9px; background: var(--series-1); color: #fff; cursor: pointer;
-}
-.gatebox button:disabled { opacity: .6; cursor: default; }
-#gatemsg { font-size: 13px; color: #d03b3b; min-height: 18px; margin: 8px 0 0; }
-#gate .fine { margin: 14px 0 0; font-size: 12px; color: var(--muted); }
 </style>
 </head>
 <body>
-<div id="gate">
-  <div class="gatebox" id="gatebox">
-    <div class="lock"><svg viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></div>
-    <h2>Private stats</h2>
-    <p>Owner access only. Sign in with the credentials set up in the dashboard host.</p>
-    <form id="gateform">
-      <input id="gateuser" type="text" autocomplete="username" spellcheck="false" placeholder="Username" aria-label="Username">
-      <input id="gatepass" type="password" autocomplete="current-password" placeholder="Password" aria-label="Password">
-      <button id="gatebtn" type="submit">Sign in</button>
-      <p id="gatemsg" role="alert"></p>
-    </form>
-    <p class="fine">The token lasts 12 hours. No data is shown to anyone without it.</p>
-  </div>
-</div>
-<div class="wrap" hidden>
+<div class="wrap">
   <header>
     <h1><a href="/">Ecodiwali</a> · Stats</h1>
     <div class="status"><span class="dot" id="dot"></span><span id="statustext">connecting…</span></div>
@@ -138,7 +101,6 @@ code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background
       <button data-d="30" type="button" aria-pressed="true">30d</button>
       <button data-d="90" type="button">90d</button>
       <button data-d="365" type="button">1y</button>
-      <button id="signout" type="button" style="margin-left:8px;background:transparent;color:var(--muted);border:0;font:inherit;font-size:13px;cursor:pointer">Sign out</button>
     </div>
   </header>
 
@@ -188,71 +150,6 @@ code { font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; background
 const $ = (s) => document.querySelector(s);
 const DAYS = 30; let curDays = DAYS;
 const REFRESH_MS = 45000;
-const TOKEN_KEY = 'ecodiwali.stats.token';
-let authToken = sessionStorage.getItem(TOKEN_KEY) || '';
-// No-login view: when the server has public access switched on (PUBLIC_OPEN in
-// api/stats.js), /api/stats?public=1 answers 200 without a token and this page
-// shows the dashboard directly - no ?open=1 flag, no sign-in. When public
-// access is off the probe 401s and the login gate appears as before.
-let OPEN = new URLSearchParams(location.search).has('open');
-async function probePublic() {
-  try {
-    const r = await fetch('/api/stats?days=30&public=1', { cache: 'no-store' });
-    OPEN = OPEN || r.status === 200;
-  } catch (e) { /* offline or server error: fall back to the login gate */ }
-}
-
-/* ---------- login gate ---------- */
-function showGate() { $('#gate').hidden = false; $('.wrap').hidden = true; }
-function showDash() { $('#gate').hidden = true; $('.wrap').hidden = false; load(); }
-
-$('#gateform').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const u = $('#gateuser').value.trim(), p = $('#gatepass').value, msg = $('#gatemsg'), btn = $('#gatebtn');
-  msg.textContent = '';
-  btn.disabled = true; btn.textContent = 'Signing in…';
-  let authResp;
-  try {
-    authResp = await fetch('/api/auth', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user: u, pass: p }),
-    });
-  } catch (err) {
-    msg.style.color = '#c0564f';
-    msg.textContent = 'Could not reach the sign-in service (network error). Reload the page and try again.';
-    return;
-  }
-  if (authResp.status === 404) {
-    msg.style.color = '#c0564f';
-    msg.textContent = 'This is an outdated copy of the page. Do a hard refresh (Cmd+Shift+R on a laptop, or open a private window) and try again.';
-    return;
-  }
-  try {
-    const j = await authResp.json();
-    if (!authResp.ok) throw new Error(j.error || 'Sign-in failed.');
-    authToken = j.token;
-    sessionStorage.setItem(TOKEN_KEY, authToken);
-    showDash();
-  } catch (err) {
-    msg.style.color = '#c0564f';
-    msg.textContent = err.message + (authResp && authResp.status ? ' (server reply ' + authResp.status + ')' : '');
-  } finally {
-    btn.disabled = false; btn.textContent = 'Sign in';
-  }
-});
-
-probePublic().then(() => {
-  // Public mode on: open the dashboard directly. A saved login token also
-  // opens it; only when neither is available does the sign-in gate appear.
-  if (authToken || OPEN) showDash();
-});
-
-$('#signout').addEventListener('click', () => {
-  authToken = '';
-  sessionStorage.removeItem(TOKEN_KEY);
-  showGate();
-});
 
 document.querySelectorAll('#days button').forEach((b) => b.addEventListener('click', () => {
   curDays = +b.dataset.d;
@@ -402,17 +299,9 @@ function recentTable(el, rows) {
 /* ---------- load + poll ---------- */
 async function load() {
   const dot = $('#dot'), st = $('#statustext');
-  if (!authToken && !OPEN) { showGate(); return; }
   dot.className = 'dot'; st.textContent = 'syncing…';
   try {
-    const qs = '/api/stats?days=' + curDays + (authToken ? '&token=' + encodeURIComponent(authToken) : '&public=1');
-    const r = await fetch(qs, { cache: 'no-store' });
-    if ((r.status === 401 || r.status === 403) && !OPEN) { // token expired (or was tampered with)
-      authToken = '';
-      sessionStorage.removeItem(TOKEN_KEY);
-      showGate();
-      return;
-    }
+    const r = await fetch('/api/stats?days=' + curDays, { cache: 'no-store' });
     const j = await r.json();
     if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
     dot.className = 'dot on';

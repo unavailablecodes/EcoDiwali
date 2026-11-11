@@ -15,8 +15,7 @@ const PUBLIC_OPEN = true; // flip to false (and redeploy) to require login again
 
 export default async function handler(req, res) {
   const token = String(req.query?.token || '');
-  const pub = PUBLIC_OPEN && req.query?.public === '1';
-  if (!verifyToken(token) && !pub) return res.status(401).json({ error: 'This stats page is private. Log in first.' });
+  if (!PUBLIC_OPEN && !verifyToken(token)) return res.status(401).json({ error: 'This stats page is private. Log in first.' });
 
   const days = Math.min(Math.max(parseInt(req.query?.days, 10) || 30, 1), 365);
   res.setHeader('Cache-Control', 'no-store');
