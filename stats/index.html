@@ -200,19 +200,32 @@ $('#gateform').addEventListener('submit', async (e) => {
   const u = $('#gateuser').value.trim(), p = $('#gatepass').value, msg = $('#gatemsg'), btn = $('#gatebtn');
   msg.textContent = '';
   btn.disabled = true; btn.textContent = 'Signing in…';
+  let authResp;
   try {
-    const r = await fetch('/api/auth', {
+    authResp = await fetch('/api/auth', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ user: u, pass: p }),
     });
-    const j = await r.json();
-    if (!r.ok) throw new Error(j.error || 'Sign-in failed.');
+  } catch (err) {
+    msg.style.color = '#c0564f';
+    msg.textContent = 'Could not reach the sign-in service (network error). Reload the page and try again.';
+    return;
+  }
+  if (authResp.status === 404) {
+    msg.style.color = '#c0564f';
+    msg.textContent = 'This is an outdated copy of the page. Do a hard refresh (Cmd+Shift+R on a laptop, or open a private window) and try again.';
+    return;
+  }
+  try {
+    const j = await authResp.json();
+    if (!authResp.ok) throw new Error(j.error || 'Sign-in failed.');
     authToken = j.token;
     sessionStorage.setItem(TOKEN_KEY, authToken);
     showDash();
   } catch (err) {
-    msg.textContent = err.message;
+    msg.style.color = '#c0564f';
+    msg.textContent = err.message + (authResp && authResp.status ? ' (server reply ' + authResp.status + ')' : '');
   } finally {
     btn.disabled = false; btn.textContent = 'Sign in';
   }
