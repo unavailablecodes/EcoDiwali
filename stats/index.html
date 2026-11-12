@@ -280,10 +280,36 @@ function osSplit(el, items) {
 }
 
 /* ---------- recent visitors table ---------- */
+// Friendly device name from what the app recorded (os + model + browser).
+// Laptops/desktops carry no model code, so fall back on the OS; Android UAs
+// carry a manufacturer code, which is mapped to a readable name where known.
+const SAMSUNG_MAP = { 'SM-S92': 'Galaxy S24', 'SM-S91': 'Galaxy S23', 'SM-S90': 'Galaxy S22', 'SM-A54': 'Galaxy A54', 'SM-A35': 'Galaxy A35', 'SM-A15': 'Galaxy A15', 'SM-G99': 'Galaxy S21' };
+function deviceLabel(r) {
+  const os = r.os || '', model = r.model || '';
+  if (model === 'iPhone') return 'iPhone';
+  if (model === 'iPad') return 'iPad';
+  if (os === 'Android') {
+    if (!model) return 'Android phone';
+    const up = model.toUpperCase();
+    if (up.startsWith('SM-')) {
+      for (const k in SAMSUNG_MAP) if (up.startsWith(k)) return SAMSUNG_MAP[k];
+      return 'Samsung ' + model;
+    }
+    if (/^M\d{4}/.test(up)) return 'Xiaomi ' + model;
+    if (up.length <= 2) return 'Android phone';
+    return model; // e.g. "Pixel 8"
+  }
+  if (os === 'macOS') return 'Mac (MacBook / iMac)';
+  if (os === 'Windows') return 'Windows PC';
+  if (os === 'ChromeOS') return 'Chromebook';
+  if (os === 'Linux') return 'Linux';
+  if (os === 'iOS') return 'iPhone / iPad';
+  return os ? os + ' device' : 'Unknown device';
+}
 function recentTable(el, rows) {
   if (!rows || !rows.length) { el.innerHTML = '<div class="empty">No data yet.</div>'; return; }
   el.innerHTML = '<div style="overflow-x:auto"><table><thead><tr>' +
-    '<th>User</th><th>First seen</th><th>Last seen</th><th>Visits</th><th>Time</th><th>Device</th><th>Location</th>' +
+    '<th>User</th><th>First seen</th><th>Last seen</th><th>Visits</th><th>Time</th><th>Device</th><th>Browser</th><th>Location</th>' +
     '</tr></thead><tbody>' +
     rows.map((r) =>
       '<tr><td><span style="font-size:11px;font-weight:600;padding:2px 9px;border-radius:999px;' +
@@ -295,8 +321,9 @@ function recentTable(el, rows) {
       '<td class="dim">' + fmtDate(r.last_seen) + '</td>' +
       '<td class="num">' + fmtNum(r.visits) + '</td>' +
       '<td class="num">' + fmtTime(r.total_time_ms) + '</td>' +
-      '<td>' + (r.model ? r.model + (r.browser ? ' · ' + r.browser : '') : (r.browser || '—')) + '</td>' +
-      '<td class="dim">' + [r.city, r.country].filter(Boolean).join(', ') || '—' + '</td></tr>').join('') +
+      '<td>' + deviceLabel(r) + '</td>' +
+      '<td class="dim">' + (r.browser || '—') + '</td>' +
+      '<td class="dim">' + ([r.city, r.country].filter(Boolean).join(', ') || '—') + '</td></tr>').join('') +
     '</tbody></table></div>';
 }
 
