@@ -3,27 +3,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<meta name="theme-color" content="#0d0a16">
+<meta name="theme-color" content="#08080a">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="Diwali firecrackers through your phone's camera. Tap the sky to burst a shell, or tilt down and set off bombs and walas on the ground.">
 <title>Ecodiwali</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%23ffae2b' stroke-width='5' stroke-linecap='round'%3E%3Cpath d='M32 6v14M32 44v14M6 32h14M44 32h14M14 14l10 10M40 40l10 10M50 14L40 24M24 40L14 50'/%3E%3C/g%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Yatra+One&display=swap">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cg stroke='%23e8b34b' stroke-width='4' stroke-linecap='round'%3E%3Cpath d='M32 6v14M32 44v14M6 32h14M44 32h14M14 14l10 10M40 40l10 10M50 14L40 24M24 40L14 50'/%3E%3C/g%3E%3C/svg%3E">
 <style>
 /* One screen: camera at the back, sparks on top, a tray of crackers in thumb reach.
-   A single night look on purpose, since it sits over a live camera. */
+   Design language: Tesla/Apple - near-black base, frosted glass with hairline
+   borders, SF-style type in light weights, thin-stroke icons, white selection
+   states, and a single restrained warm accent. */
 :root {
-  --night: #0d0a16;
-  --tray: rgba(13, 10, 22, .62);
-  --text: #fff3e2;
-  --muted: rgba(255, 243, 226, .66);
-  --marigold: #ffae2b;
-  --font-title: "Yatra One", Georgia, serif;
-  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --night: #08080a;
+  --tray: rgba(18, 19, 22, .58);
+  --glass: blur(28px) saturate(170%);
+  --hair: rgba(255, 255, 255, .10);
+  --text: #f5f5f7;
+  --muted: rgba(245, 245, 247, .60);
+  --faint: rgba(245, 245, 247, .38);
+  --accent: #e8b34b;
+  --font-title: -apple-system, "SF Pro Display", "SF Pro Text", "Segoe UI", Inter, Roboto, sans-serif;
+  --font-ui: -apple-system, "SF Pro Text", "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -46,18 +48,31 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
   position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 8px;
   padding: calc(env(safe-area-inset-top, 0px) + 12px) calc(env(safe-area-inset-right, 0px) + 14px) 0 calc(env(safe-area-inset-left, 0px) + 14px);
 }
-#mode, #surfaceBtn, #catBtn { padding: 7px 12px; border: 0; border-radius: 999px; background: var(--tray); font-size: 14px; font-weight: 600; }
-#surfaceBtn { cursor: pointer; font-weight: 500; }
+#mode, #surfaceBtn, #catBtn {
+  padding: 8px 14px; border: 1px solid var(--hair); border-radius: 999px; background: var(--tray);
+  -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass);
+  font-size: 13px; font-weight: 500; letter-spacing: .01em;
+}
+#mode { color: var(--muted); }
+#surfaceBtn { cursor: pointer; }
 #catBtn { cursor: pointer; }
-#catBtn[aria-pressed="true"] { background: var(--marigold); color: #1a1205; }
+#catBtn[aria-pressed="true"] { background: var(--text); border-color: transparent; color: #0b0b0d; }
 .spacer { flex: 1; }
-.round { width: 42px; height: 42px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 50%; background: var(--tray); cursor: pointer; }
-.round svg { width: 20px; height: 20px; stroke: var(--text); fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.round {
+  width: 40px; height: 40px; display: grid; place-items: center; padding: 0; border: 1px solid var(--hair);
+  border-radius: 50%; background: var(--tray); -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass);
+  cursor: pointer; transition: background .2s;
+}
+.round:active { background: rgba(42, 44, 50, .72); }
+.round svg { width: 19px; height: 19px; stroke: var(--text); fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 
 #hint {
-  position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 118px); transform: translateX(-50%);
-  width: max-content; max-width: calc(100vw - 32px); padding: 8px 14px; border-radius: 10px; background: var(--tray);
-  font-size: 15px; text-align: center; opacity: 0; transition: opacity .35s; pointer-events: none;
+  position: absolute; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 116px); transform: translateX(-50%);
+  width: max-content; max-width: calc(100vw - 40px); padding: 9px 18px; border-radius: 999px;
+  background: var(--tray); border: 1px solid var(--hair);
+  -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass);
+  font-size: 14px; font-weight: 400; color: var(--text); text-align: center;
+  opacity: 0; transition: opacity .35s; pointer-events: none;
 }
 #hint.show { opacity: 1; }
 
@@ -67,31 +82,45 @@ button:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 }
 #picker::-webkit-scrollbar { display: none; }
 .pick {
-  flex: none; width: 76px; display: grid; justify-items: center; gap: 3px; padding: 9px 4px 8px; border: 0; border-radius: 14px; cursor: pointer;
-  background: var(--tray); font-size: 12.5px; white-space: nowrap;
+  flex: none; width: 74px; display: grid; justify-items: center; gap: 5px; padding: 10px 4px 9px;
+  border: 1px solid var(--hair); border-radius: 16px; cursor: pointer;
+  background: var(--tray); -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass);
+  font-size: 11.5px; font-weight: 500; letter-spacing: .01em; white-space: nowrap; color: var(--muted);
+  transition: background .2s, color .2s;
 }
-.pick svg { width: 28px; height: 28px; stroke: currentColor; fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
-.pick[aria-pressed="true"] { background: var(--marigold); color: #1a1205; font-weight: 600; }
+.pick svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
+.pick[aria-pressed="true"] { background: var(--text); border-color: transparent; color: #0b0b0d; }
+.pick[aria-pressed="true"] svg { opacity: 1; }
 
 #start {
   position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
   padding: calc(env(safe-area-inset-top, 0px) + 18vh) 24px calc(env(safe-area-inset-bottom, 0px) + 56px);
 }
-#start small { display: block; margin-bottom: 4px; font-size: 15px; color: var(--marigold); }
-#start h1 { margin: 0 0 10px; font-family: var(--font-title); font-weight: 400; font-size: clamp(44px, 13vw, 60px); line-height: 1.1; }
-#start p { margin: 0 0 24px; max-width: 30ch; font-size: 16px; color: var(--muted); }
-#startBtn { display: block; width: min(220px, 100%); padding: 14px 20px; border: 0; border-radius: 12px; background: var(--marigold); color: #1a1205; font-size: 17px; font-weight: 600; cursor: pointer; }
-#startBtn:disabled { opacity: .6; }
-#start .fine { margin: 14px 0 0; font-size: 13px; }
-#start #credit { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 20px); max-width: none; margin: 0; font-size: 13px; }
-#bootError { position: fixed; inset: auto 16px 20px; z-index: 20; padding: 12px 14px; border-radius: 10px; background: #231b33; font-size: 15px; }
+#start small { display: block; margin-bottom: 16px; font-size: 11px; font-weight: 500; letter-spacing: .32em; text-transform: uppercase; color: var(--accent); }
+#start h1 { margin: 0 0 14px; font-family: var(--font-title); font-weight: 200; font-size: clamp(52px, 15vw, 84px); line-height: 1.05; letter-spacing: -.03em; }
+#start p { margin: 0 0 40px; max-width: 26ch; font-size: 15px; font-weight: 400; line-height: 1.5; color: var(--muted); }
+#startBtn {
+  display: block; width: min(220px, 100%); padding: 15px 0; border: 0; border-radius: 999px;
+  background: var(--text); color: #0a0a0a; font-size: 16px; font-weight: 500; letter-spacing: .01em; cursor: pointer;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .35); transition: transform .15s;
+}
+#startBtn:active { transform: scale(.97); }
+#startBtn:disabled { opacity: .5; }
+#start .fine { margin: 18px 0 0; font-size: 13px; color: var(--faint); }
+#start #credit { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom, 0px) + 22px); max-width: none; margin: 0; font-size: 12px; letter-spacing: .04em; color: var(--faint); }
+#bootError {
+  position: fixed; inset: auto 20px 24px; z-index: 20; padding: 14px 18px; border-radius: 14px;
+  background: var(--tray); border: 1px solid var(--hair); -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass);
+  font-size: 14px; font-weight: 400; color: var(--text);
+}
 #safeWarn {
   position: absolute; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 64px); transform: translateX(-50%);
-  width: max-content; max-width: calc(100vw - 24px); padding: 10px 14px; border-radius: 12px;
-  background: rgba(86, 20, 18, .9); border: 1px solid rgba(255, 150, 100, .5);
-  font-size: 13.5px; text-align: center; line-height: 1.4;
+  width: max-content; max-width: calc(100vw - 32px); padding: 12px 16px; border-radius: 14px;
+  background: rgba(28, 10, 10, .78); border: 1px solid rgba(255, 120, 100, .28);
+  -webkit-backdrop-filter: var(--glass); backdrop-filter: var(--glass);
+  font-size: 13.5px; font-weight: 400; text-align: center; line-height: 1.45; color: var(--text);
 }
-#safeWarn strong { color: #ffd9a0; }
+#safeWarn strong { color: #ffce9e; font-weight: 600; }
 
 @media (prefers-reduced-motion: reduce) { #hint { transition: none; } }
 </style>
@@ -242,7 +271,7 @@ scene.add(camera);
 const glLostEl = document.createElement('div');
 glLostEl.id = 'glLost';
 glLostEl.hidden = true;
-glLostEl.style.cssText = 'position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:60;max-width:340px;text-align:center;background:#231b33;color:#fff;padding:12px 14px;border-radius:10px;font:14px/1.5 system-ui, sans-serif;box-shadow:0 6px 24px rgba(0,0,0,.5)';
+glLostEl.style.cssText = 'position:fixed;left:50%;bottom:64px;transform:translateX(-50%);z-index:60;max-width:340px;text-align:center;background:rgba(18,19,22,.72);border:1px solid rgba(255,255,255,.1);backdrop-filter:blur(28px) saturate(170%);-webkit-backdrop-filter:blur(28px) saturate(170%);color:#f5f5f7;padding:12px 16px;border-radius:999px;font:13px/1.5 -apple-system,system-ui,sans-serif;box-shadow:0 8px 24px rgba(0,0,0,.35)';
 document.body.appendChild(glLostEl);
 glCanvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault(); // let the browser try to restore in place instead of killing the canvas
